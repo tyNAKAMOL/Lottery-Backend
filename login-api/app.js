@@ -59,7 +59,7 @@ app.post("/login", jsonParser, function (req, res, next) {
         users[0].Password,
         function (err, isLogin) {
           if (isLogin) {
-            var token = jwt.sign({ email: users[0].Username }, secret, {
+            var token = jwt.sign({ username: users[0].Username }, secret, {
               expiresIn: "1h",
             });
             res.json({ status: "ok", message: "login success", token });
@@ -75,7 +75,8 @@ app.post("/login", jsonParser, function (req, res, next) {
 });
 app.post("/authen", jsonParser, function (req, res, next) {
   try {
-    const token = req.headers.authorization.split(" ")[1];
+    const arr = req.headers.authorization.split(" ");
+    const token = arr[1];
     var decoded = jwt.verify(token, secret);
     res.json({ status: "ok", decoded });
   } catch (err) {
