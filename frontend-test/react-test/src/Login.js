@@ -23,6 +23,8 @@ function Login() {
           localStorage.setItem("token", data.token);
           window.location = "/home";
           console.log("Success:", data);
+        } else {
+          console.log("Failed", data);
         }
       })
       .catch((error) => {
