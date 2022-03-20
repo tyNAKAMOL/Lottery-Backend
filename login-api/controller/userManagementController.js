@@ -3,18 +3,26 @@ const saltRounds = 10;
 var jwt = require("jsonwebtoken");
 const secret = "Login";
 const mysql = require("mysql2");
-const connection = mysql.createConnection({
+
+const connectionUser = mysql.createConnection({
   host: "localhost",
   user: "root",
-  database: "mydb",
+  database: "user",
+});
+
+const connectionCustomer = mysql.createConnection({
+  host: "localhost",
+  user: "root",
+  database: "customer",
 });
 
 const login = (req, res) => {
   console.log(req.body);
-  connection.execute(
-    "SELECT * FROM account WHERE Username=?",
+  connectionUser.execute(
+    "SELECT * FROM user WHERE Username=?",
     [req.body.Username],
     function (err, users) {
+      console.log(users);
       if (err) {
         res.json({ status: "error", message: err });
         return;
@@ -27,6 +35,7 @@ const login = (req, res) => {
         req.body.Password,
         users[0].Password,
         function (err, isLogin) {
+          console.log(err);
           if (isLogin) {
             var token = jwt.sign({ username: users[0].Username }, secret, {
               expiresIn: "1h",
@@ -43,9 +52,19 @@ const login = (req, res) => {
 
 const register = (req, res, next) => {
   try {
+    console.log(req.body);
+    // console.log(typeof req.body);
+    // //console.log(Object.keys(req.body)==['Title','Firstname','Lastname','Username','Password','Email','Birthday','Tel','Address','IDCard','URLImage','Role']);
     let errMsg = "";
-    connection.execute(
-      "SELECT * FROM account WHERE Username=? or Email=?",
+    // //let a = await validate();
+    // if (!req.body.soi) {
+    //   res.json({ status: "Error", message: "soi is null" });
+    // } else {
+    //   res.json({ status: "200OK", message: "Register Success" });
+    // }
+
+    connectionCustomer.execute(
+      "SELECT * FROM customer_account WHERE Username=? or Email=?",
       [req.body.Username, req.body.Email],
       function (err, results) {
         console.log(results.length);
@@ -67,29 +86,60 @@ const register = (req, res, next) => {
           res.json({ status: "ok", message: errMsg });
         } else {
           bcrypt.hash(req.body.Password, saltRounds, function (err, hash) {
-            connection.execute(
-              "INSERT INTO account (Username,Email,Password,FirstName,LastName) VALUES (?,?,?,?,?)",
-              [
-                req.body.Username,
-                req.body.Email,
-                hash,
-                req.body.FirstName,
-                req.body.LastName,
-              ],
+            connectionUser.execute(
+              "INSERT INTO user (Username,Password,Role) VALUES (?,?,?)",
+              [req.body.Username, hash, req.body.Role],
               function (err) {
                 if (err) {
                   res.json({ status: "error", message: err });
                   return;
                 }
-                res.json({ status: "ok", message: "Register Success" });
               }
             );
           });
+          connectionCustomer.execute(
+            "INSERT INTO customer_account (Title,Firstname,Lastname,Username,Email,Birthday,Tel,HomeNo,Soi,Road,Subdistrict,District,Province,ZipCode,IDCard,URLImage) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [
+              req.body.Title,
+              req.body.Firstname,
+              req.body.Lastname,
+              req.body.Username,
+              req.body.Email,
+              req.body.Birthday,
+              req.body.Tel,
+              req.body.Address.HomeNo,
+              req.body.Address.Soi,
+              req.body.Address.Road,
+              req.body.Address.Subdistrict,
+              req.body.Address.District,
+              req.body.Address.Province,
+              req.body.Address.ZipCode,
+              req.body.IDCard,
+              req.body.URLImage,
+            ],
+            function (err) {
+              if (err) {
+                connectionUser.execute(
+                  "DELETE FROM user WHERE Username=?",
+                  [req.body.Username],
+                  function (error) {
+                    if (error) {
+                      res.json({ status: "error", message: error });
+                      return;
+                    }
+                  }
+                );
+                res.json({ status: "error", message: err });
+                return;
+              }
+              res.json({ status: "200OK", message: "Register Success" });
+            }
+          );
         }
       }
     );
   } catch (error) {
-    res.json({ status: "error", message: err.message });
+    res.json({ status: "error", message: error.message });
   }
 };
 
@@ -97,8 +147,8 @@ const logout = (req, res) => {
   console.log(req.body.token);
   const decoded = jwt.verify(req.body.token, secret);
   const { username } = decoded;
-  connection.execute(
-    "SELECT * FROM account WHERE Username=?",
+  connectionUser.execute(
+    "SELECT * FROM user WHERE Username=?",
     [username],
     function (err, users, fields) {
       if (err) {

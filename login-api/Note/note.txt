@@ -1,0 +1,74 @@
+Request
+{
+  "Title": "นาย",
+  "Firstname": "สมชาย",
+  "Lastname": "ใจกล้า",
+  "Username":"Somchai12312121",
+  "Password":"Somchai123",
+  "Birthday": "25610203",
+  "Tel": "0625555522",
+  "Address": {
+    "HouseNo": "20/1",
+    "soi": "พัฒนาการ58",
+    "road": "พัฒนาการ",
+    "subdistrict": "สวนหลวง",
+    "district": "สวนหลวง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": "10250"
+  },
+  "IDCard": "11007xxxxxxxx",
+  "URLImage": "/image/me.png",
+  "Email": "6001xxxx@kmitl.ac.th"
+  "Role":"Buyer"
+}
+
+Round 1
+User
+Query from user database
+{
+    "Username":"Somchai12312121",
+    "Email": "6001xxxx@kmitl.ac.th"
+}
+
+Round 2
+User
+Insert data
+{
+    "Username":"Somchai12312121",
+    "Password":"Somchai123",
+    "Role":"Buyer"
+}
+
+Customer
+Insert data
+{
+  "Title": "นาย",
+  "Firstname": "สมชาย",
+  "Lastname": "ใจกล้า",
+  "Username":"Somchai12312121",
+  "Birthday": "25610203",
+  "Tel": "0625555522",
+  "Address": {
+    "HouseNo": "20/1",
+    "soi": "พัฒนาการ58",
+    "road": "พัฒนาการ",
+    "subdistrict": "สวนหลวง",
+    "district": "สวนหลวง",
+    "province": "กรุงเทพมหานคร",
+    "zipcode": "10250"
+  },
+  "IDCard": "11007xxxxxxxx",
+  "URLImage": "/image/me.png",
+  "Email": "6001xxxx@kmitl.ac.th"
+}
+
+['Title','Firstname','Lastname','Username','Password','Email','Birthday','Tel','Address','IDCard','URLImage','Role']
+
+[
+  {
+    ID: 1,
+    Username: 'abcdf2',
+    Password: '$2b$10$vTs6gJlmn7APXqdKRaqthum',
+    Role: 'Seller'
+  }
+]
