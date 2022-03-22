@@ -72,3 +72,26 @@ Insert data
     Role: 'Seller'
   }
 ]
+
+/api/update/account/seller/:action
+/api/update/account/seller/url_image
+
+/updateAccount/seller/:action  //action = ChangeImage/ChangeBankInfo/ChangeAccountInfo
+
+/updateAccount/seller/ChangeImage
+Request
+{
+  "url_image":"../",
+  "token":"abcdefg"
+}
+Response
+{
+  "status":"200OK",
+  "Message":"Success"
+}
+
+Method 
+GET -> get data from url (No BodyRequest)
+POST -> get data from BodyRequest,Insert data
+PUT -> update data 
+DELETE -> delete data
