@@ -95,3 +95,4 @@ GET -> get data from url (No BodyRequest)
 POST -> get data from BodyRequest,Insert data
 PUT -> update data 
 DELETE -> delete data
+

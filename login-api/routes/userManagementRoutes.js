@@ -5,17 +5,21 @@ const {
   logout,
   sellerUpdateAccount,
   getSellerAccount,
-  getBankSeller
+  getBankSeller,
+  getCustomerAccount,
+  customerUpdateAccount,
 } = require("../controller/userManagementController");
 
 const router = express.Router();
 
-router.get("/getCustomerAccount/:token",getSellerAccount)
-router.get("/getSellerBank/:token",getBankSeller);
 router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
-router.put("/updateAccount/seller/:action",sellerUpdateAccount);
+router.get("/getSellerAccount/:token", getSellerAccount);
+router.get("/getSellerBank/:token", getBankSeller);
+router.get("/getCustomerAccount/:token", getCustomerAccount);
+router.put("/updateSellerAccount/seller/:action", sellerUpdateAccount);
+router.put("/updateCustomerAccount/customer/:action", customerUpdateAccount);
 
 module.exports = {
   routes: router,
