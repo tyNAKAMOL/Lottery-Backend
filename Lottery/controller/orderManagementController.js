@@ -14,6 +14,13 @@ const connectionCustomer = mysql.createConnection({
   database: "customer",
 });
 
+const connectionCommon = mysql.createConnection({
+  host: "localhost",
+  user: "root",
+});
+
+
+
 const add_cart = (req, res) => {
   try {
     const decoded = jwt.verify(req.body.token, secret);
@@ -22,10 +29,11 @@ const add_cart = (req, res) => {
     let sellerID = -1;
     if (role == "customer") {
       connectionCustomer.execute(
-        "SELECT * FROM customer_account WHERE Username=? ",
+        "SELECT CID FROM customer_account WHERE Username=? ",
         [username],
         function (err, results) {
           if (err) {
+            console.log("error CID")
             res.json({
               status: "500IS",
               message: "Internal Server : " + err,
@@ -34,10 +42,11 @@ const add_cart = (req, res) => {
           } else {
             customerID = results[0].CID;
             connectionCustomer.execute(
-              "SELECT * FROM seller_account WHERE Storename=? ",
+              "SELECT SID FROM seller_account WHERE Storename=? ",
               [req.body.Storename],
               function (err, results) {
                 if (err) {
+                  console.log("error SID")
                   res.json({
                     status: "500IS",
                     message: "Internal Server : " + err,
@@ -55,6 +64,7 @@ const add_cart = (req, res) => {
                     ],
                     function (err) {
                       if (err) {
+                        console.log("error Cart")
                         res.json({
                           status: "500IS",
                           message: "Internal Server : " + err,
@@ -84,6 +94,7 @@ const add_cart = (req, res) => {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
 };
+
 const get_cart = (req, res) => {
   try {
     const decoded = jwt.verify(req.params.token, secret);
@@ -91,7 +102,7 @@ const get_cart = (req, res) => {
     let customerID = -1;
     if (role == "customer") {
       connectionCustomer.execute(
-        "SELECT * FROM customer_account WHERE Username=? ",
+        "SELECT CID FROM customer_account WHERE Username=? ",
         [username],
         function (err, results) {
           if (err) {
@@ -124,10 +135,11 @@ const get_cart = (req, res) => {
                         });
                         return;
                       } else {
-                        connectionOrder.execute(
-                          "SELECT * FROM cart WHERE CID=? ",
+                        connectionCommon.execute(
+                         " SELECT a.Number_lottery, a.set_Lottery, b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
                           [customerID],
                           function (err, cart_) {
+                            console.log(cart_)
                             if (err) {
                               res.json({
                                 status: "500IS",
@@ -135,15 +147,10 @@ const get_cart = (req, res) => {
                               });
                               return;
                             } else {
-                              let cart = {
-                                Storename: results[0].Storename,
-                                Number_lottery: cart_[0].Number_lottery,
-                                set_Lottery: cart_[0].set_Lottery,
-                              };
                               res.json({
                                 status: "200OK",
                                 message: "get cart success",
-                                Cart: cart,
+                                Cart: cart_,
                               });
                             }
                           }
@@ -167,6 +174,23 @@ const get_cart = (req, res) => {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
 };
+
+const update_cart = (req,res) =>{
+  try{
+    const decoded = jwt.verify(req.params.token, secret);
+    const { username, role } = decoded;
+    if(role=="customer"){
+
+    }else{
+      res.json({
+        status: "401UR",
+        message: "Unauthorized",
+      });
+    }
+  }catch(error){
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+}
 
 module.exports = {
   add_cart,
