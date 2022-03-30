@@ -349,7 +349,7 @@ const sellerUpdateAccount = (req, res) => {
                   }
                   res.json({
                     status: "200OK",
-                    message: "Seller update bank success",
+                    message: "Seller update bank success!!",
                   });
                 }
               );
@@ -367,7 +367,7 @@ const sellerUpdateAccount = (req, res) => {
                   }
                   res.json({
                     status: "200OK",
-                    message: "Seller update URLImage success",
+                    message: "Seller update URLImage success!!",
                   });
                 }
               );
@@ -401,7 +401,7 @@ const sellerUpdateAccount = (req, res) => {
                   } else {
                     res.json({
                       status: "200OK",
-                      message: "Seller update account success",
+                      message: "Seller update account success!!",
                     });
                   }
                 }
@@ -461,7 +461,7 @@ const getCustomerAccount = (req, res) => {
             };
             res.json({
               status: "200OK",
-              message: "get data account Success",
+              message: "get data account success!!",
               sellerAccount: customer,
             });
           }
@@ -518,7 +518,7 @@ const getSellerAccount = (req, res) => {
             };
             res.json({
               status: "200OK",
-              message: "get data account Success",
+              message: "get data account success!!",
               sellerAccount: seller,
             });
           }

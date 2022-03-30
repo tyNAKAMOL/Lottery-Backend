@@ -96,3 +96,44 @@ POST -> get data from BodyRequest,Insert data
 PUT -> update data 
 DELETE -> delete data
 
+Request
+{
+  "startNumber":"100000",
+  "endNumber":"999999",
+  "listNumber":[
+    {
+      "lotteryNumber":"231450"
+    },
+    {
+      "lotteryNumber":"231451"
+    },
+    {
+      "lotteryNumber":"231452"
+    },
+    {
+      "lotteryNumber":"231453"
+    },
+    {
+      "lotteryNumber":"231454"
+    },
+    {
+      "lotteryNumber":"231455"
+    }
+  ]
+}
+
+Request Addcart
+
+Case Single Lottery
+{
+  "SID":"",
+  "Number":"",
+  "Amount":""
+}
+
+Case Pack Lottery
+{
+  "SID":"",
+  "PLID":""
+}
+

@@ -19,8 +19,6 @@ const connectionCommon = mysql.createConnection({
   user: "root",
 });
 
-
-
 const add_cart = (req, res) => {
   try {
     const decoded = jwt.verify(req.body.token, secret);
@@ -33,7 +31,7 @@ const add_cart = (req, res) => {
         [username],
         function (err, results) {
           if (err) {
-            console.log("error CID")
+            console.log("error CID");
             res.json({
               status: "500IS",
               message: "Internal Server : " + err,
@@ -46,7 +44,7 @@ const add_cart = (req, res) => {
               [req.body.Storename],
               function (err, results) {
                 if (err) {
-                  console.log("error SID")
+                  console.log("error SID");
                   res.json({
                     status: "500IS",
                     message: "Internal Server : " + err,
@@ -55,19 +53,19 @@ const add_cart = (req, res) => {
                 } else {
                   sellerID = results[0].SID;
                   connectionOrder.execute(
-                    "INSERT INTO cart (Number_lottery,set_Lottery,SID,CID) VALUES (?,?,?,?)",
+                    "INSERT INTO cart (Number_lottery,Amount,SID,CID) VALUES (?,?,?,?)",
                     [
                       req.body.Number_lottery,
-                      req.body.set_Lottery,
+                      req.body.Amount,
                       sellerID,
                       customerID,
                     ],
-                    function (err) {
-                      if (err) {
-                        console.log("error Cart")
+                    function (error) {
+                      if (error) {
+                        console.log("error Cart");
                         res.json({
                           status: "500IS",
-                          message: "Internal Server : " + err,
+                          message: "Internal Server : " + error,
                         });
                         return;
                       } else {
@@ -136,14 +134,14 @@ const get_cart = (req, res) => {
                         return;
                       } else {
                         connectionCommon.execute(
-                         " SELECT a.Number_lottery, a.set_Lottery, b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
+                          " SELECT a.Number_lottery, a.Amount, b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
                           [customerID],
-                          function (err, cart_) {
-                            console.log(cart_)
-                            if (err) {
+                          function (error, cart_) {
+                            console.log(cart_);
+                            if (error) {
                               res.json({
                                 status: "500IS",
-                                message: "Internal Server : " + err,
+                                message: "Internal Server : " + error,
                               });
                               return;
                             } else {
@@ -175,24 +173,123 @@ const get_cart = (req, res) => {
   }
 };
 
-const update_cart = (req,res) =>{
-  try{
-    const decoded = jwt.verify(req.params.token, secret);
+const update_cart = (req, res) => {
+  try {
+    const decoded = jwt.verify(req.body.token, secret);
     const { username, role } = decoded;
-    if(role=="customer"){
-
-    }else{
+    if (role == "customer") {
+      connectionCustomer.execute(
+        "SELECT CID FROM customer_account WHERE Username=? ",
+        [username],
+        function (error, results) {
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+          } else {
+            connectionOrder.execute(
+              "SELECT Number_lottery , Amount FROM cart WHERE CID = ? and Number_lottery = ?",
+              [results[0].CID, req.body.Number_lottery],
+              function (error) {
+                if (error) {
+                  res.json({
+                    status: "500IS",
+                    message: "Internal Server : " + error,
+                  });
+                } else {
+                  connectionOrder.execute(
+                    "UPDATE cart SET Amount=? WHERE Number_lottery=? ",
+                    [req.body.Amount, req.body.Number_lottery],
+                    function (error) {
+                      if (error) {
+                        res.json({
+                          status: "500IS",
+                          message: "Internal Server : " + error,
+                        });
+                      } else {
+                        res.json({
+                          status: "200OK",
+                          message: "customer update amount success!!",
+                        });
+                      }
+                    }
+                  );
+                }
+              }
+            );
+          }
+        }
+      );
+    } else {
       res.json({
         status: "401UR",
         message: "Unauthorized",
       });
     }
-  }catch(error){
+  } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
-}
+};
+
+const delete_cart = (req, res) => {
+  try {
+    const decoded = jwt.verify(req.body.token, secret);
+    const { username, role } = decoded;
+    if (role == "customer") {
+      connectionCustomer.execute(
+        "SELECT CID FROM customer_account WHERE Username=? ",
+        [username],
+        function (error, results) {
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+          } else {
+            connectionOrder.execute(
+              "SELECT * FROM cart WHERE CID = ? and Number_lottery = ?",
+              [results[0].CID, req.body.Number_lottery],
+              function (error) {
+                if (error) {
+                  res.json({
+                    status: "500IS",
+                    message: "Internal Server : " + error,
+                  });
+                } else {
+                  connectionOrder.execute(
+                    "DELETE FROM cart WHERE Number_lottery=? ",
+                    [req.body.Number_lottery],
+                    function (error) {
+                      if (error) {
+                        res.json({
+                          status: "500IS",
+                          message: "Internal Server : " + error,
+                        });
+                      } else {
+                        res.json({
+                          status: "200OK",
+                          message:
+                            "customer remove lottery from cart success!!",
+                        });
+                      }
+                    }
+                  );
+                }
+              }
+            );
+          }
+        }
+      );
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
 
 module.exports = {
   add_cart,
   get_cart,
+  update_cart,
+  delete_cart,
 };
