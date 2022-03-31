@@ -13,14 +13,15 @@ const connectionCustomer = mysql.createConnection({
   database: "customer",
 });
 
-const add_singleLottery = async(req, res) => {
+const add_singleLottery = async (req, res) => {
   try {
     const decoded = jwt.verify(req.body.token, secret);
     const { username, role } = decoded;
-    const ERROR = false;
+    let errorAddLottery = false;
+    // const x = await checkErrorAddLottery(req, res, countAddLottery);
     var countAddLottery = 0;
     if (role == "seller") {
-      await connectionCustomer.execute(
+      connectionCustomer.execute(
         "SELECT SID FROM seller_account WHERE Username=? ",
         [username],
         function (error, results) {
@@ -32,7 +33,7 @@ const add_singleLottery = async(req, res) => {
             });
             return;
           } else {
-            req.body.lotteryList.forEach((element) => {
+            req.body.lotteryList.forEach(async (element) => {
               connectionLottery.execute(
                 "INSERT INTO singlelottery (Number,Lot,Draw,SID) VALUES (?,?,?,?)",
                 [element.Number, element.Lot, element.Draw, results[0].SID],
@@ -45,19 +46,17 @@ const add_singleLottery = async(req, res) => {
                       message: "Internal Server : " + error,
                     });
                     return;
-                  }else{
+                  } else {
                     countAddLottery = countAddLottery + 1;
-                    console.log("in loop",countAddLottery)
-
+                    console.log("in loop", countAddLottery);
                   }
                 }
               );
+              errorAddLottery = await checkErrorAddLottery(req, res, countAddLottery);
             });
             console.log(req.body.lotteryList.length);
-            console.log(countAddLottery)
-
-            if (req.body.lotteryList.length != countAddLottery) {
-              console.log("error add single lottery");
+            console.log(countAddLottery);
+            if (errorAddLottery) {
               res.json({
                 status: "500IS",
                 message: "Internal Server : " + "error add single lottery",
@@ -84,4 +83,16 @@ const add_singleLottery = async(req, res) => {
 
 module.exports = {
   add_singleLottery,
+};
+
+const checkErrorAddLottery = async (req, res, countAddLottery) => {
+  try {
+    let ERROR = false;
+    if (req.body.lotteryList.length != countAddLottery) {
+      ERROR = true;
+    }
+    return ERROR;
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
 };
