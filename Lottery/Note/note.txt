@@ -145,6 +145,13 @@ get lottery show in page
   "stock":""
 }
 
+Add cart
+{
+  "SID":"",
+  "Number":"",
+  "Amount":""
+}
+
 
 Scenario2 Pack Lottery Page
 get lottery show in page
@@ -162,4 +169,41 @@ get Cart
   "PLID":"",
   "Number":"",
   "Amount":""
+}
+
+
+{
+  "token":"",
+  "lotteryList":[
+    {
+      "Number":"123456",
+      "Lot":"01"
+      "Draw":"20"
+    },
+    {
+      "Number":"123456",
+      "Lot":"01"
+      "Draw":"20"
+    },
+    {
+      "Number":"123456",
+      "Lot":"01"
+      "Draw":"20"
+    },
+    {
+      "Number":"123456",
+      "Lot":"01"
+      "Draw":"20"
+    },
+    {
+      "Number":"123456",
+      "Lot":"01"
+      "Draw":"20"
+    },
+    {
+      "Number":"123456",
+      "Lot":"01"
+      "Draw":"20"
+    }
+  ]
 }

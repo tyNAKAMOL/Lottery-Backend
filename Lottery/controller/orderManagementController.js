@@ -25,6 +25,7 @@ const add_cart = (req, res) => {
     const { username, role } = decoded;
     let customerID = -1;
     let sellerID = -1;
+    let lotteryPack = ""
     if (role == "customer") {
       connectionCustomer.execute(
         "SELECT CID FROM customer_account WHERE Username=? ",
@@ -39,6 +40,9 @@ const add_cart = (req, res) => {
             return;
           } else {
             customerID = results[0].CID;
+            if(req.body.Pack_Flag!=""){
+              lotteryPack = req.body.Pack_Flag
+            }
             connectionCustomer.execute(
               "SELECT SID FROM seller_account WHERE Storename=? ",
               [req.body.Storename],
@@ -53,12 +57,13 @@ const add_cart = (req, res) => {
                 } else {
                   sellerID = results[0].SID;
                   connectionOrder.execute(
-                    "INSERT INTO cart (Number_lottery,Amount,SID,CID) VALUES (?,?,?,?)",
+                    "INSERT INTO cart (Number_lottery,Amount,SID,CID,Pack_Flag) VALUES (?,?,?,?,?)",
                     [
                       req.body.Number_lottery,
                       req.body.Amount,
                       sellerID,
                       customerID,
+                      lotteryPack 
                     ],
                     function (error) {
                       if (error) {
@@ -134,7 +139,7 @@ const get_cart = (req, res) => {
                         return;
                       } else {
                         connectionCommon.execute(
-                          " SELECT a.Number_lottery, a.Amount, b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
+                          " SELECT a.Number_lottery, a.Amount,a.Pack_Flag, b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
                           [customerID],
                           function (error, cart_) {
                             console.log(cart_);
