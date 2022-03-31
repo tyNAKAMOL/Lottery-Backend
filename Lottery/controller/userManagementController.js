@@ -22,10 +22,10 @@ const login = (req, res) => {
     connectionUser.execute(
       "SELECT * FROM user WHERE Username=?",
       [req.body.Username],
-      function (err, users) {
+      function (error, users) {
         console.log(users);
-        if (err) {
-          res.json({ status: "500IS", message: "Internal Server : " + err });
+        if (error) {
+          res.json({ status: "500IS", message: "Internal Server : " + error });
           return;
         }
         if (users.length == 0) {
@@ -35,8 +35,8 @@ const login = (req, res) => {
         bcrypt.compare(
           req.body.Password,
           users[0].Password,
-          function (err, isLogin) {
-            console.log(err);
+          function (error, isLogin) {
+            console.log(error);
             if (isLogin) {
               var token = jwt.sign(
                 { username: users[0].Username, role: users[0].Role },
@@ -91,11 +91,11 @@ const register = (req, res, next) => {
       connectionCustomer.execute(
         "SELECT * FROM seller_account WHERE Username=? or Email=?",
         [req.body.Username, req.body.Email],
-        function (err, results) {
-          if (err) {
+        function (error, results) {
+          if (error) {
             res.json({
               status: "500IS",
-              message: "Internal Server : " + err,
+              message: "Internal Server : " + error,
             });
             return;
           } else {
@@ -106,11 +106,11 @@ const register = (req, res, next) => {
               connectionCustomer.execute(
                 "SELECT * FROM customer_account WHERE Username=? or Email=?",
                 [req.body.Username, req.body.Email],
-                function (err, results) {
-                  if (err) {
+                function (error, results) {
+                  if (error) {
                     res.json({
                       status: "500IS",
-                      message: "Internal Server : " + err,
+                      message: "Internal Server : " + error,
                     });
                     return;
                   } else {
@@ -121,15 +121,15 @@ const register = (req, res, next) => {
                       bcrypt.hash(
                         req.body.Password,
                         saltRounds,
-                        function (err, hash) {
+                        function (error, hash) {
                           connectionUser.execute(
                             "INSERT INTO user (Username,Password,Role) VALUES (?,?,?)",
                             [req.body.Username, hash, req.body.Role],
-                            function (err) {
-                              if (err) {
+                            function (error) {
+                              if (error) {
                                 res.json({
                                   status: "500IS",
-                                  message: "Internal Server : " + err,
+                                  message: "Internal Server : " + error,
                                 });
                                 return;
                               } else {
@@ -154,8 +154,8 @@ const register = (req, res, next) => {
                                     req.body.Address.ZipCode,
                                     req.body.IDCard,
                                   ],
-                                  function (err) {
-                                    if (err) {
+                                  function (error) {
+                                    if (error) {
                                       console.log("error condition");
                                       connectionUser.execute(
                                         "DELETE FROM user WHERE Username=?",
@@ -174,7 +174,7 @@ const register = (req, res, next) => {
                                       );
                                       res.json({
                                         status: "500IS",
-                                        message: "Internal Server : " + err,
+                                        message: "Internal Server : " + error,
                                       });
                                       return;
                                     }
@@ -212,9 +212,9 @@ const logout = (req, res) => {
     connectionUser.execute(
       "SELECT * FROM user WHERE Username=?",
       [username],
-      function (err, users, fields) {
-        if (err) {
-          res.json({ status: "500IS", message: "Internal Server : " + err });
+      function (error, users, fields) {
+        if (error) {
+          res.json({ status: "500IS", message: "Internal Server : " + error });
           return;
         }
         if (users.length == 0) {
@@ -237,9 +237,9 @@ const customerUpdateAccount = (req, res) => {
       connectionUser.execute(
         "SELECT * FROM user WHERE Username=?",
         [username],
-        function (err, users) {
-          if (err) {
-            res.json({ status: "500IS", message: "Internal Server : " + err });
+        function (error, users) {
+          if (error) {
+            res.json({ status: "500IS", message: "Internal Server : " + error });
             return;
           }
           if (users.length == 0) {
@@ -250,11 +250,11 @@ const customerUpdateAccount = (req, res) => {
               connectionCustomer.execute(
                 "UPDATE customer_account SET URL_image_profile=? WHERE Username=? ",
                 [req.body.URL_image_profile, username],
-                function (err) {
-                  if (err) {
+                function (error) {
+                  if (error) {
                     res.json({
                       status: "500IS",
-                      message: "Internal Server : " + err,
+                      message: "Internal Server : " + error,
                     });
                     return;
                   }
@@ -283,11 +283,11 @@ const customerUpdateAccount = (req, res) => {
                   req.body.Address.ZipCode,
                   username,
                 ],
-                function (err) {
-                  if (err) {
+                function (error) {
+                  if (error) {
                     res.json({
                       status: "500IS",
-                      message: "Internal Server : " + err,
+                      message: "Internal Server : " + error,
                     });
                     return;
                   } else {
@@ -321,9 +321,9 @@ const sellerUpdateAccount = (req, res) => {
       connectionUser.execute(
         "SELECT * FROM user WHERE Username=?",
         [username],
-        function (err, users) {
-          if (err) {
-            res.json({ status: "500IS", message: "Internal Server : " + err });
+        function (error, users) {
+          if (error) {
+            res.json({ status: "500IS", message: "Internal Server : " + error });
             return;
           }
           if (users.length == 0) {
@@ -339,11 +339,11 @@ const sellerUpdateAccount = (req, res) => {
                   req.body.Bank_Account_Name,
                   username,
                 ],
-                function (err) {
-                  if (err) {
+                function (error) {
+                  if (error) {
                     res.json({
                       status: "500IS",
-                      message: "Internal Server : " + err,
+                      message: "Internal Server : " + error,
                     });
                     return;
                   }
@@ -357,11 +357,11 @@ const sellerUpdateAccount = (req, res) => {
               connectionCustomer.execute(
                 "UPDATE seller_account SET URL_image_profile=? WHERE Username=? ",
                 [req.body.URL_image_profile, username],
-                function (err) {
-                  if (err) {
+                function (error) {
+                  if (error) {
                     res.json({
                       status: "500IS",
-                      message: "Internal Server : " + err,
+                      message: "Internal Server : " + error,
                     });
                     return;
                   }
@@ -391,11 +391,11 @@ const sellerUpdateAccount = (req, res) => {
                   req.body.Storename,
                   username,
                 ],
-                function (err) {
-                  if (err) {
+                function (error) {
+                  if (error) {
                     res.json({
                       status: "500IS",
-                      message: "Internal Server : " + err,
+                      message: "Internal Server : " + error,
                     });
                     return;
                   } else {
@@ -429,11 +429,11 @@ const getCustomerAccount = (req, res) => {
       connectionCustomer.execute(
         "select * from customer_account where username=?",
         [username],
-        function (err, result) {
-          if (err) {
+        function (error, result) {
+          if (error) {
             res.json({
               status: "500IS",
-              message: "Internal Server : " + err,
+              message: "Internal Server : " + error,
             });
             return;
           } else if (result.length == 0) {
@@ -485,11 +485,11 @@ const getSellerAccount = (req, res) => {
       connectionCustomer.execute(
         "select * from seller_account where username=?",
         [username],
-        function (err, result) {
-          if (err) {
+        function (error, result) {
+          if (error) {
             res.json({
               status: "500IS",
-              message: "Internal Server : " + err,
+              message: "Internal Server : " + error,
             });
             return;
           } else if (result.length == 0) {
@@ -546,11 +546,11 @@ const getBankSeller = (req, res) => {
       connectionCustomer.execute(
         "select * from seller_account where username=?",
         [username],
-        function (err, result) {
-          if (err) {
+        function (error, result) {
+          if (error) {
             res.json({
               status: "500IS",
-              message: "Internal Server : " + err,
+              message: "Internal Server : " + error,
             });
             return;
           } else if (result.length == 0) {

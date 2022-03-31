@@ -29,12 +29,12 @@ const add_cart = (req, res) => {
       connectionCustomer.execute(
         "SELECT CID FROM customer_account WHERE Username=? ",
         [username],
-        function (err, results) {
-          if (err) {
+        function (error, results) {
+          if (error) {
             console.log("error CID");
             res.json({
               status: "500IS",
-              message: "Internal Server : " + err,
+              message: "Internal Server : " + error,
             });
             return;
           } else {
@@ -42,12 +42,12 @@ const add_cart = (req, res) => {
             connectionCustomer.execute(
               "SELECT SID FROM seller_account WHERE Storename=? ",
               [req.body.Storename],
-              function (err, results) {
-                if (err) {
+              function (error, results) {
+                if (error) {
                   console.log("error SID");
                   res.json({
                     status: "500IS",
-                    message: "Internal Server : " + err,
+                    message: "Internal Server : " + error,
                   });
                   return;
                 } else {
@@ -102,11 +102,11 @@ const get_cart = (req, res) => {
       connectionCustomer.execute(
         "SELECT CID FROM customer_account WHERE Username=? ",
         [username],
-        function (err, results) {
-          if (err) {
+        function (error, results) {
+          if (error) {
             res.json({
               status: "500IS",
-              message: "Internal Server : " + err,
+              message: "Internal Server : " + error,
             });
             return;
           } else {
@@ -114,22 +114,22 @@ const get_cart = (req, res) => {
             connectionOrder.execute(
               "SELECT * FROM cart WHERE CID=? ",
               [customerID],
-              function (err, results) {
-                if (err) {
+              function (error, results) {
+                if (error) {
                   res.json({
                     status: "500IS",
-                    message: "Internal Server : " + err,
+                    message: "Internal Server : " + error,
                   });
                   return;
                 } else {
                   connectionCustomer.execute(
                     "SELECT * FROM seller_account WHERE SID=? ",
                     [results[0].SID],
-                    function (err, results) {
-                      if (err) {
+                    function (error, results) {
+                      if (error) {
                         res.json({
                           status: "500IS",
-                          message: "Internal Server : " + err,
+                          message: "Internal Server : " + error,
                         });
                         return;
                       } else {

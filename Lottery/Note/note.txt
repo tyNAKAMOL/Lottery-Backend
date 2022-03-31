@@ -137,3 +137,29 @@ Case Pack Lottery
   "PLID":""
 }
 
+Scenario1 Single Lottery Page
+get lottery show in page
+{
+  "SID":"",
+  "Number":"",
+  "stock":""
+}
+
+
+Scenario2 Pack Lottery Page
+get lottery show in page
+{
+  "SID":"",
+  "PLID":"",
+  "Number":"",
+  "Amount":""
+}
+
+
+get Cart
+{
+  "SID":"",
+  "PLID":"",
+  "Number":"",
+  "Amount":""
+}
