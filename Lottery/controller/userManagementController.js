@@ -239,7 +239,10 @@ const customerUpdateAccount = (req, res) => {
         [username],
         function (error, users) {
           if (error) {
-            res.json({ status: "500IS", message: "Internal Server : " + error });
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
             return;
           }
           if (users.length == 0) {
@@ -266,13 +269,12 @@ const customerUpdateAccount = (req, res) => {
               );
             } else if (req.params.action == "ChangeAccountInfo") {
               connectionCustomer.execute(
-                "UPDATE customer_account SET Title=?,Firstname=?,Lastname=?,Email=?,Birthday=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=? WHERE Username=?",
+                "UPDATE customer_account SET Title=?,Firstname=?,Lastname=?,Email=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=? WHERE Username=?",
                 [
                   req.body.Title,
                   req.body.Firstname,
                   req.body.Lastname,
                   req.body.Email,
-                  req.body.Birthday,
                   req.body.Tel,
                   req.body.Address.HomeNo,
                   req.body.Address.Soi,
@@ -323,7 +325,10 @@ const sellerUpdateAccount = (req, res) => {
         [username],
         function (error, users) {
           if (error) {
-            res.json({ status: "500IS", message: "Internal Server : " + error });
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
             return;
           }
           if (users.length == 0) {

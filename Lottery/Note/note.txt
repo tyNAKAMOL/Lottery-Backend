@@ -207,3 +207,27 @@ get Cart
     }
   ]
 }
+
+{
+  "token":"",
+  "lotteryList":[
+    {
+      "Number":"123456",
+      "Lot":"01|04"
+      "Amount":"2",
+      "Draw":"20"
+    },
+    {
+      "Number":"654321",
+      "Lot":"02|07",
+      "Amount":"2",
+      "Draw":"20"
+    },
+    {
+      "Number":"445522",
+      "Lot":"03|02|05",
+      "Amount":"3",
+      "Draw":"20"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 var jwt = require("jsonwebtoken");
 const secret = "Login";
+var moment = require("moment");
 
 const mysql = require("mysql2");
 const connectionLottery = mysql.createConnection({
@@ -17,14 +18,11 @@ const add_singleLottery = async (req, res) => {
   try {
     const decoded = jwt.verify(req.body.token, secret);
     const { username, role } = decoded;
-    let errorAddLottery = false;
-    // const x = await checkErrorAddLottery(req, res, countAddLottery);
-    var countAddLottery = 0;
     if (role == "seller") {
       connectionCustomer.execute(
         "SELECT SID FROM seller_account WHERE Username=? ",
         [username],
-        function (error, results) {
+        async function (error, results) {
           if (error) {
             console.log("error SID");
             res.json({
@@ -33,35 +31,12 @@ const add_singleLottery = async (req, res) => {
             });
             return;
           } else {
-            req.body.lotteryList.forEach(async (element) => {
-              connectionLottery.execute(
-                "INSERT INTO singlelottery (Number,Lot,Draw,SID) VALUES (?,?,?,?)",
-                [element.Number, element.Lot, element.Draw, results[0].SID],
-                function (error) {
-                  if (error) {
-                    ERROR = true;
-                    console.log("error add single lottery");
-                    res.json({
-                      status: "500IS",
-                      message: "Internal Server : " + error,
-                    });
-                    return;
-                  } else {
-                    countAddLottery = countAddLottery + 1;
-                    console.log("in loop", countAddLottery);
-                  }
-                }
-              );
-              errorAddLottery = await checkErrorAddLottery(req, res, countAddLottery);
-            });
-            console.log(req.body.lotteryList.length);
-            console.log(countAddLottery);
-            if (errorAddLottery) {
-              res.json({
-                status: "500IS",
-                message: "Internal Server : " + "error add single lottery",
-              });
-            } else {
+            const countAddLottery = await countAddSingleLottery(
+              req,
+              res,
+              results
+            );
+            if (countAddLottery == true) {
               res.json({
                 status: "200OK",
                 message: "Add single lottery to store success!!",
@@ -81,18 +56,206 @@ const add_singleLottery = async (req, res) => {
   }
 };
 
-module.exports = {
-  add_singleLottery,
-};
-
-const checkErrorAddLottery = async (req, res, countAddLottery) => {
+const add_packLottery = async (req, res) => {
   try {
-    let ERROR = false;
-    if (req.body.lotteryList.length != countAddLottery) {
-      ERROR = true;
+    const decoded = jwt.verify(req.body.token, secret);
+    const { username, role } = decoded;
+    if (role == "seller") {
+      connectionCustomer.execute(
+        "SELECT SID FROM seller_account WHERE Username=? ",
+        [username],
+        async function (error, results) {
+          if (error) {
+            console.log("error SID");
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+            return;
+          } else {
+            const countAddLottery = await countAddPackLottery(
+              req,
+              res,
+              results
+            );
+            if (countAddLottery == true) {
+              res.json({
+                status: "200OK",
+                message: "Add pack lottery to store success!!",
+              });
+            }
+          }
+        }
+      );
+    } else {
+      res.json({
+        status: "401UR",
+        message: "Unauthorized",
+      });
     }
-    return ERROR;
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
+};
+
+const get_singleLottery = (req,res) => {
+  try {
+    connectionLottery.execute(
+      "SELECT x.Number, x.Lot, x.Draw, y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.OID='' Group By x.Number, y.Storename" ,
+      function (error, S_lottery) {
+        console.log(S_lottery);
+        if (error) {
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+          return;
+        } else {
+          res.json({
+            status: "200OK",
+            message: "get single lottery success",
+            single_lottery: S_lottery,
+          });
+        }
+      }
+    );
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
+const get_packLottery = (req,res) => {
+  try {
+    connectionLottery.execute(
+      "SELECT x.Number, x.Lot, x.Draw,x.Amount, y.Storename FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.OID=''",
+      function (error, P_lottery) {
+        console.log(P_lottery);
+        if (error) {
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+          return;
+        } else {
+          res.json({
+            status: "200OK",
+            message: "get pack lottery success",
+            pack_lottery: P_lottery,
+          });
+        }
+      }
+    );
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
+module.exports = {
+  add_singleLottery,
+  add_packLottery,
+  get_singleLottery,
+  get_packLottery,
+};
+
+const countAddSingleLottery = async (req, res, results) => {
+  let AddLottery = true;
+  await req.body.lotteryList.forEach(async (element) => {
+    await connectionLottery.execute(
+      "INSERT INTO singlelottery (Number,Lot,Draw,SID,Date) VALUES (?,?,?,?,?)",
+      [
+        element.Number,
+        element.Lot,
+        element.Draw,
+        results[0].SID,
+        moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+      ],
+      async function (error) {
+        if (error) {
+          connectionLottery.execute(
+            "DELETE FROM singlelottery WHERE SID=? and Date BETWEEN ? and ?",
+            [
+              results[0].SID,
+              moment(new Date())
+                .subtract(20, "seconds")
+                .format("YYYYMMDDHHmmssZZ"),
+              moment(new Date()).add(20, "seconds").format("YYYYMMDDHHmmssZZ"),
+            ],
+            function (error) {
+              if (error) {
+                console.log("error add single lottery");
+                res.json({
+                  status: "500IS",
+                  message: "Internal Server : " + error,
+                });
+                AddLottery = false;
+                return AddLottery;
+              }
+            }
+          );
+          console.log("error add single lottery");
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+          AddLottery = false;
+          return AddLottery;
+        }
+      }
+    );
+    console.log("in loop");
+  });
+  console.log("in function", AddLottery);
+  return AddLottery;
+};
+
+const countAddPackLottery = async (req, res, results) => {
+  let AddLottery = true;
+  await req.body.lotteryList.forEach(async (element) => {
+    await connectionLottery.execute(
+      "INSERT INTO packlottery (Number,Lot,Draw,SID,Date,Amount) VALUES (?,?,?,?,?,?)",
+      [
+        element.Number,
+        element.Lot,
+        element.Draw,
+        results[0].SID,
+        moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+        element.Amount,
+      ],
+      async function (error) {
+        if (error) {
+          connectionLottery.execute(
+            "DELETE FROM packlottery WHERE SID=? and Date BETWEEN ? and ?",
+            [
+              results[0].SID,
+              moment(new Date())
+                .subtract(20, "seconds")
+                .format("YYYYMMDDHHmmssZZ"),
+              moment(new Date()).add(20, "seconds").format("YYYYMMDDHHmmssZZ"),
+            ],
+            function (error) {
+              if (error) {
+                console.log("error add pack lottery");
+                res.json({
+                  status: "500IS",
+                  message: "Internal Server : " + error,
+                });
+                AddLottery = false;
+                return AddLottery;
+              }
+            }
+          );
+          console.log("error add pack lottery");
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+          AddLottery = false;
+          return AddLottery;
+        }
+      }
+    );
+    console.log("in loop");
+  });
+  console.log("in function", AddLottery);
+  return AddLottery;
 };
