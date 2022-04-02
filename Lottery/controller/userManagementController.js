@@ -178,6 +178,25 @@ const register = (req, res, next) => {
                                       });
                                       return;
                                     }
+                                    if (
+                                      req.body.wantToBeSeller != null &&
+                                      req.body.wantToBeSeller == true
+                                    ) {
+                                      connectionCustomer.execute(
+                                        "UPDATE seller_account SET URLImage=? , Storename=? WHERE Username=?",
+                                        [req.body.URLImage,req.body.Firstname,req.body.Username],
+                                        function (error) {
+                                          if (error) {
+                                            res.json({
+                                              status: "500IS",
+                                              message:
+                                                "Internal Server : " + error,
+                                            });
+                                            return;
+                                          }
+                                        }
+                                      );
+                                    }
                                     res.json({
                                       status: "200OK",
                                       message: "Register Success",
@@ -318,7 +337,6 @@ const sellerUpdateAccount = (req, res) => {
   try {
     const decoded = jwt.verify(req.body.token, secret);
     const { username, role } = decoded;
-    // console.log(req.params.action);
     if (role == "seller") {
       connectionUser.execute(
         "SELECT * FROM user WHERE Username=?",
