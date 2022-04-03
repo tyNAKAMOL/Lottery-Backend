@@ -101,7 +101,7 @@ const add_packLottery = async (req, res) => {
 const get_singleLottery = (req,res) => {
   try {
     connectionLottery.execute(
-      "SELECT x.Number, x.Draw, x.DrawDate,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.OID='' Group By x.Number, x.Draw, y.Storename" ,
+      "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Status='Available' Group By x.Number, x.Draw, y.Storename" ,
       function (error, S_lottery) {
         console.log(S_lottery);
         if (error) {
@@ -127,7 +127,7 @@ const get_singleLottery = (req,res) => {
 const get_packLottery = (req,res) => {
   try {
     connectionLottery.execute(
-      "SELECT x.Number, x.Draw,x.Amount,x.DrawDate, y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.OID='' Group By x.Number, x.Draw, x.Amount, y.Storename",
+      "SELECT x.Number, x.Draw,x.Amount,x.Status,x.DrawDate, y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Status='Available' Group By x.Number, x.Draw, x.Amount, y.Storename",
       function (error, P_lottery) {
         console.log(P_lottery);
         if (error) {
@@ -161,14 +161,15 @@ const countAddSingleLottery = async (req, res, results) => {
   let AddLottery = true;
   await req.body.lotteryList.forEach(async (element) => {
     await connectionLottery.execute(
-      "INSERT INTO singlelottery (Number,Lot,Draw,SID,Date,DrawDate) VALUES (?,?,?,?,?)",
+      "INSERT INTO singlelottery (Number,Lot,Draw,SID,Date,DrawDate,Status) VALUES (?,?,?,?,?,?,?)",
       [
         element.Number,
         element.Lot,
         element.Draw,
         results[0].SID,
         moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-        element.DrawDate
+        element.DrawDate,
+        "Available"
       ],
       async function (error) {
         if (error) {
@@ -213,7 +214,7 @@ const countAddPackLottery = async (req, res, results) => {
   let AddLottery = true;
   await req.body.lotteryList.forEach(async (element) => {
     await connectionLottery.execute(
-      "INSERT INTO packlottery (Number,Lot,Draw,SID,Date,Amount,DrawDate) VALUES (?,?,?,?,?,?)",
+      "INSERT INTO packlottery (Number,Lot,Draw,SID,Date,Amount,DrawDate,Status) VALUES (?,?,?,?,?,?,?,?)",
       [
         element.Number,
         element.Lot,
@@ -222,6 +223,7 @@ const countAddPackLottery = async (req, res, results) => {
         moment(new Date()).format("YYYYMMDDHHmmssZZ"),
         element.Amount,
         element.DrawDate,
+        "Available"
       ],
       async function (error) {
         if (error) {

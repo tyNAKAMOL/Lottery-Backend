@@ -1,5 +1,6 @@
 var jwt = require("jsonwebtoken");
 const secret = "Login";
+var moment = require("moment");
 
 const mysql = require("mysql2");
 const connectionOrder = mysql.createConnection({
@@ -18,6 +19,11 @@ const connectionCommon = mysql.createConnection({
   host: "localhost",
   user: "root",
 });
+const connectionLottery = mysql.createConnection({
+  host: "localhost",
+  user: "root",
+  database: "lottery",
+});
 
 const add_cart = (req, res) => {
   try {
@@ -25,7 +31,7 @@ const add_cart = (req, res) => {
     const { username, role } = decoded;
     let customerID = -1;
     let sellerID = -1;
-    let lotteryPack = ""
+    let lotteryPack = "";
     if (role == "customer") {
       connectionCustomer.execute(
         "SELECT CID FROM customer_account WHERE Username=? ",
@@ -40,8 +46,8 @@ const add_cart = (req, res) => {
             return;
           } else {
             customerID = results[0].CID;
-            if(req.body.Pack_Flag!=""){
-              lotteryPack = req.body.Pack_Flag
+            if (req.body.Pack_Flag != "") {
+              lotteryPack = req.body.Pack_Flag;
             }
             connectionCustomer.execute(
               "SELECT SID FROM seller_account WHERE Storename=? ",
@@ -63,7 +69,7 @@ const add_cart = (req, res) => {
                       req.body.Amount,
                       sellerID,
                       customerID,
-                      lotteryPack 
+                      lotteryPack,
                     ],
                     function (error) {
                       if (error) {
@@ -292,9 +298,233 @@ const delete_cart = (req, res) => {
   }
 };
 
+const confirmed_order = (req, res) => {
+  try {
+    const decoded = jwt.verify(req.body.token, secret);
+    const { username, role } = decoded;
+    if (role == "customer") {
+      connectionCustomer.execute(
+        "SELECT CID FROM customer_account WHERE Username=? ",
+        [username],
+        function (error, results) {
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+          } else {
+            connectionOrder.execute(
+              "INSERT INTO order_c (OrderDate,Payment,Status,CID) VALUES (?,?,?,?)",
+              [
+                moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+                "Transfer",
+                "Order Confirmed",
+                results[0].CID,
+              ],
+              function (error) {
+                if (error) {
+                  res.json({
+                    status: "500IS",
+                    message: "Internal Server : " + error,
+                  });
+                } else {
+                  connectionOrder.execute(
+                    "SELECT * FROM cart WHERE CID=?",
+                    [results[0].CID],
+                    function (error, orderInCart) {
+                      if (error) {
+                        res.json({
+                          status: "500IS",
+                          message: "Internal Server : " + error,
+                        });
+                      } else {
+                        orderInCart.forEach((element) => {
+                          // console.log(orderInCart)
+                          if (
+                            element.Pack_Flag != null &&
+                            element.Pack_Flag == "Y"
+                          ) {
+                            connectionLottery.execute(
+                              "UPDATE packlottery SET Status=? WHERE Number=?",
+                              ["Reserved", element.Number]
+                            );
+                          }
+                        });
+                      }
+                    }
+                  );
+                }
+              }
+            );
+          }
+        }
+      );
+    } else {
+      res.json({
+        status: "401UR",
+        message: "Unauthorized",
+      });
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
 module.exports = {
   add_cart,
   get_cart,
   update_cart,
   delete_cart,
+  confirmed_order,
+};
+
+const createOrder = async (req, res, results) => {
+  try {
+    await connectionOrder.execute(
+      "INSERT INTO order_c (OrderDate,Payment,Status,CID) VALUES (?,?,?,?)",
+      [
+        moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+        "Transfer",
+        "Order Confirmed",
+        results[0].CID,
+      ],
+      function (error) {
+        if (error) {
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+        } else {
+          connectionOrder.execute(
+            "SELECT OID FROM order_c WHERE Status='Order Confirmed' and CID=?",
+            [results[0].CID],
+            function (error, resultOID) {
+              if (error) {
+                res.json({
+                  status: "500IS",
+                  message: "Internal Server : " + error,
+                });
+              } else {
+                return resultOID[0].OID;
+              }
+            }
+          );
+        }
+      }
+    );
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
+const OrderConfirmedCart = (req, res,results) => {
+  try {
+    connectionOrder.execute(
+      "SELECT * FROM cart WHERE CID=?",
+      [results[0].CID],
+      function (error, orderInCart) {
+        if (error) {
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+        } else {
+          return orderInCart
+        }
+      }
+    );
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+const OrderConfirmedLottery = async(req, res, orderList) => {
+  let lotteryOrderList = []
+  let errorOrderList = []
+  let countAmount = 0
+  try {
+    if(orderList != null){
+      await orderList.forEach(async(element)=>{
+        if (
+          element.Pack_Flag != null &&
+          element.Pack_Flag == "Y"
+        ) {
+          await connectionLottery.execute(
+            "SELECT * FROM packlottery WHERE status='Available' and Number=?",
+            [element.Number],
+            async function (error, results) {
+              if (error) {
+                res.json({
+                  status: "500IS",
+                  message: "Internal Server : " + error,
+                });
+              } else {
+                if(results.length>=element.Amount){
+                  for(let i=0 ; i < element.Amount ; i++){
+                   await connectionLottery.execute(
+                      "UPDATE packlottery SET Status=? WHERE Number=? and Lot=? and Draw=?",
+                      ["reserved",results[i].Number,results[i].Lot,results[i].Draw],
+                      function (error, results) {
+                        if (error) {
+                          res.json({
+                            status: "500IS",
+                            message: "Internal Server : " + error,
+                          });
+                        } else {
+                          lotteryOrderList.push(results[i]);
+                        }
+                      }
+                    );
+                  }
+                }
+                else{
+                  errorOrderList.push({
+                    "Number": element.Number,
+                    "Amount": element.Amount,
+                    "Stock": results.length
+                  });
+                }
+              }
+            }
+          );
+        }else{
+          await connectionLottery.execute(
+            "SELECT * FROM singlelottery WHERE status='Available' and Number=?",
+            [element.Number],
+            async function (error, results) {
+              if (error) {
+                res.json({
+                  status: "500IS",
+                  message: "Internal Server : " + error,
+                });
+              } else {
+                for(let i=0 ; i < element.Amount ; i++){
+                  await connectionLottery.execute(
+                    "UPDATE singlelottery SET Status=? WHERE Number=? and Lot=? and Draw=?",
+                    ["reserved",results[i].Number,results[i].Lot,results[i].Draw],
+                    function (error, results) {
+                      if (error) {
+                        res.json({
+                          status: "500IS",
+                          message: "Internal Server : " + error,
+                        });
+                      } else {
+                        lotteryOrderList.push(results[i]);
+                      }
+                    }
+                  );
+                }
+              }
+            }
+          );
+        }
+        countAmount = countAmount + element.Amount;
+      })
+      if(countAmount == lotteryOrderList.length){
+        return lotteryOrderList;
+      }  
+    }
+    return lotteryOrderList=[];
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
 };

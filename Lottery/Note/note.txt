@@ -231,3 +231,16 @@ get Cart
     }
   ]
 }
+
+Confirm Order Card
+{
+  "token":""
+  "cartList":[{
+    "LID":"1",
+    "Number_Lottery":"123456",
+    "Amount":"1",
+    "SID":"",
+    "Pack_flag":"",
+
+  }]
+}
