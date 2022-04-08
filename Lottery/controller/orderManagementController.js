@@ -116,57 +116,39 @@ const get_cart = async (req, res) => {
   }
 };
 
-const update_cart = (req, res) => {
+const update_cart = async (req, res) => {
   try {
     const decoded = jwt.verify(req.body.token, secret);
     const { username, role } = decoded;
     if (role == "customer") {
-      connectionCustomer.execute(
+      const [customerID] = await promiseCustomer.execute(
         "SELECT CID FROM customer_account WHERE Username=? ",
-        [username],
-        function (error, results) {
-          if (error) {
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          } else {
-            connectionOrder.execute(
-              "SELECT Number_lottery , Amount FROM cart WHERE CID = ? and Number_lottery = ?",
-              [results[0].CID, req.body.Number_lottery],
-              function (error) {
-                if (error) {
-                  res.json({
-                    status: "500IS",
-                    message: "Internal Server : " + error,
-                  });
-                  return;
-                } else {
-                  connectionOrder.execute(
-                    "UPDATE cart SET Amount=? WHERE Number_lottery=? ",
-                    [req.body.Amount, req.body.Number_lottery],
-                    function (error) {
-                      if (error) {
-                        res.json({
-                          status: "500IS",
-                          message: "Internal Server : " + error,
-                        });
-                        return;
-                      } else {
-                        res.json({
-                          status: "200OK",
-                          message: "customer update amount success!!",
-                        });
-                      }
-                    }
-                  );
-                }
-              }
+        [username]
+      );
+      if (req.body.errorOrderList.length != 0) {
+        for (let i = 0; i < req.body.errorOrderList.length; i++) {
+          const [orderInCart] = await promiseOrder.execute(
+            "SELECT Number_lottery , Amount FROM cart WHERE CID = ? and Number_lottery = ? and SID=?",
+            [customerID[0].CID , req.body.errorOrderList[i].Number_lottery , req.body.errorOrderList[i].SID]
+          );
+          if (orderInCart.length != 0) {
+            await promiseOrder.execute(
+              "UPDATE cart SET Amount=? WHERE CID = ? and Number_lottery = ? and SID=? ",
+              [req.body.errorOrderList[i].Stock, customerID[0].CID, req.body.errorOrderList[i].Number_lottery , req.body.errorOrderList[i].SID]
             );
           }
+          res.json({
+            status: "200OK",
+            message: "customer update amount success!!",
+          });
         }
-      );
+      }
+      else{
+        res.json({
+          status: "403MP",
+          message: "Missing or invalid Parameter:[errorOrderList is null]",
+        });
+      }
     } else {
       res.json({
         status: "401UR",
@@ -214,7 +196,7 @@ const confirmed_order = async (req, res) => {
     const { username, role } = decoded;
     if (role == "customer") {
       const [results] = await promiseCustomer.execute(
-        "SELECT CID FROM customer_account WHERE Username=? ",
+        "SELECT CID FROM customer_account WHERE Username=?",
         [username]
       );
       await promiseOrder.execute(
@@ -238,7 +220,7 @@ const confirmed_order = async (req, res) => {
         [results[0].CID]
       );
       console.log("orderInCart", orderInCart);
-      const infoOrderList_ = await OrderConfirmedLottery(req, res, orderInCart);
+      const infoOrderList_ = await OrderConfirmedLottery(req, res, orderInCart,OID[0].OID);
       console.log("infoOrderList -> ", infoOrderList_);
       await confirmedPayment(req, res, infoOrderList_, OID[0].OID);
     } else {
@@ -253,12 +235,13 @@ const confirmed_order = async (req, res) => {
 };
 
 const update_URLSlip = async (req, res) => {
+  const lotteryList = []
   try {
     const decoded = jwt.verify(req.body.token, secret);
     const { username, role } = decoded;
     if (role == "customer") {
       const [status] = await promiseOrder.execute(
-        "SELECT Status FROM order_c WHERE OID=?",
+        "SELECT Status,CID FROM order_c WHERE OID=?",
         [req.body.OrderID]
       );
       if (status[0].Status == "Pending Payment") {
@@ -266,14 +249,44 @@ const update_URLSlip = async (req, res) => {
           "UPDATE order_c SET URLSlip=?, Status='Audit Payment' WHERE Status='Pending Payment' and OID=?",
           [req.body.URLSlip, req.body.OrderID]
         );
+        const[single] = await promiseLottery.execute(
+          "SELECT * FROM singlelottery WHERE OID=?",
+          [req.body.OrderID]
+        )
+        const[pack] = await promiseLottery.execute(
+          "SELECT * FROM packlottery WHERE OID=?",
+          [req.body.OrderID]
+        )
+        if(single.length>0){
+          for(let i=0 ; i<single.length ; i++){
+            lotteryList.push(single[i])
+          }
+        }
+        if(pack.length>0){
+          for(let i=0 ; i < pack.length ; i++){
+            lotteryList.push(pack[i])
+          }
+        }
+        console.log(lotteryList)
+        for(const element of lotteryList){
+          await promiseOrder.execute(
+            "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID) VALUES (?,?,?,?,?,?)",
+            [element.Number,element.Lot,element.Draw,element.DrawDate,element.SID,element.OID]
+          );
+        }
+        await promiseOrder.execute(
+          "DELETE FROM cart WHERE CID=?",
+          [status[0].CID]
+        );
         res.json({
-          status: "200OK",//can update
+          status: "200OK", //can update
           message: "update URLSlip success!!",
         });
       } else {
         res.json({
-          status: "200CU",//cannot update
-          message: "cannot update URLSlip because orderStatus: "+status[0].Status,
+          status: "200CU", //cannot update
+          message:
+            "cannot update URLSlip because orderStatus: " + status[0].Status,
         });
       }
     }
@@ -291,7 +304,29 @@ module.exports = {
   update_URLSlip,
 };
 
-const OrderConfirmedLottery = async (req, res, orderList) => {
+const getSellerID = async (Storename) => {
+  const [sellerID] = await promiseCustomer.execute(
+    "SELECT SID FROM seller_account WHERE Storename=?",
+    [Storename]
+  );
+  return sellerID[0].SID;
+};
+const getStorename = async (SID) => {
+  const [storename] = await promiseCustomer.execute(
+    "SELECT Storename FROM seller_account WHERE SID=?",
+    [SID]
+  );
+  return storename[0].Storename;
+};
+
+const updateOutOfStock = async (Number, SID, CID) => {
+  await promiseOrder.execute(
+    "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=? ",
+    [Number, SID, CID]
+  );
+};
+
+const OrderConfirmedLottery = async (req, res, orderList,OID) => {
   let lotteryOrderList = [];
   let errorOrderList = [];
   let infoOrderList = [];
@@ -305,6 +340,7 @@ const OrderConfirmedLottery = async (req, res, orderList) => {
             "SELECT * FROM packlottery WHERE status='Available' and Number=?",
             [element.Number]
           );
+          const storeName = await getStorename(element.SID)
           if (packLottery.length > 0) {
             let orderSize =
               packLottery.length >= element.Amount
@@ -315,14 +351,17 @@ const OrderConfirmedLottery = async (req, res, orderList) => {
                 Number: element.Number_lottery,
                 Amount: element.Amount,
                 Stock: packLottery.length,
+                Storename: storeName,
+                SID: element.SID,
                 Status: "Changed Amount",
               });
             }
             for (let i = 0; i < orderSize; i++) {
               await promiseLottery.execute(
-                "UPDATE packlottery SET Status=? WHERE Number=? and Lot=? and Draw=?",
+                "UPDATE packlottery SET Status=? , OID=? WHERE Number=? and Lot=? and Draw=?",
                 [
                   "reserved",
+                  OID,
                   packLottery[i].Number_lottery,
                   packLottery[i].Lot,
                   packLottery[i].Draw,
@@ -335,8 +374,11 @@ const OrderConfirmedLottery = async (req, res, orderList) => {
               Number: element.Number_lottery,
               Amount: element.Amount,
               Stock: packLottery.length,
+              Storename: storeName,
+              SID: element.SID,
               Status: "Changed Amount",
             });
+            updateOutOfStock(element.Number_lottery, element.SID, element.CID);
           }
         } else {
           console.log("single");
@@ -355,14 +397,17 @@ const OrderConfirmedLottery = async (req, res, orderList) => {
                 Number: element.Number_lottery,
                 Amount: element.Amount,
                 Stock: singleLottery.length,
+                Storename: storeName,
+                SID: element.SID,
                 Status: "Changed Amount",
               });
             }
             console.log("orderSize", orderSize);
             for (let i = 0; i < orderSize; i++) {
               await promiseLottery.execute(
-                "UPDATE singlelottery SET Status='reserved' WHERE Number=? and Lot=? and Draw=?",
+                "UPDATE singlelottery SET Status='reserved' , OID=? WHERE Number=? and Lot=? and Draw=?",
                 [
+                  OID,
                   singleLottery[i].Number,
                   singleLottery[i].Lot,
                   singleLottery[i].Draw,
@@ -377,12 +422,14 @@ const OrderConfirmedLottery = async (req, res, orderList) => {
               Number: element.Number_lottery,
               Amount: element.Amount,
               Stock: singleLottery.length,
+              Storename: storeName,
+              SID: element.SID,
               Status: "Changed Amount",
             });
+            updateOutOfStock(element.Number_lottery, element.SID, element.CID);
           }
         }
       }
-
       infoOrderList.push({
         lotteryList: lotteryOrderList,
         errorList: errorOrderList,
