@@ -142,7 +142,7 @@ const update_cart = async (req, res) => {
             message: "customer update amount success!!",
           });
         }
-      }
+      }                     
       else{
         res.json({
           status: "403MP",
@@ -311,6 +311,7 @@ const getSellerID = async (Storename) => {
   );
   return sellerID[0].SID;
 };
+
 const getStorename = async (SID) => {
   const [storename] = await promiseCustomer.execute(
     "SELECT Storename FROM seller_account WHERE SID=?",

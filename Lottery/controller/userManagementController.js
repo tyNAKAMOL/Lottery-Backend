@@ -183,7 +183,7 @@ const register = (req, res, next) => {
                                       req.body.wantToBeSeller == true
                                     ) {
                                       connectionCustomer.execute(
-                                        "UPDATE seller_account SET URLImage=? , Storename=? WHERE Username=?",
+                                        "UPDATE seller_account SET URLImage=? , Storename=?,Status='flow New Register' WHERE Username=?",
                                         [req.body.URLImage,req.body.Firstname,req.body.Username],
                                         function (error) {
                                           if (error) {

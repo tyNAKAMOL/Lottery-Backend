@@ -244,3 +244,18 @@ Confirm Order Card
 
   }]
 }
+
+searchLottery
+
+xx11xx
+
+
+sql like statement
+
+a% = word starting with a
+%a = word ending with a
+%a% = word contains with a
+
+_ = position
+
+

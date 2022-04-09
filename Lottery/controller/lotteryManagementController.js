@@ -20,7 +20,7 @@ const add_singleLottery = async (req, res) => {
     const { username, role } = decoded;
     if (role == "seller") {
       connectionCustomer.execute(
-        "SELECT SID FROM seller_account WHERE Username=? ",
+        "SELECT SID,Status FROM seller_account WHERE Username=? ",
         [username],
         async function (error, results) {
           if (error) {
@@ -98,10 +98,92 @@ const add_packLottery = async (req, res) => {
   }
 };
 
-const get_singleLottery = (req,res) => {
+const get_lottery = (req, res) => {
+  const Lottery = [];
+  try {
+    const decoded = jwt.verify(req.params.token, secret);
+    const { username, role } = decoded;
+    // const K = await getSellerID(username)
+    if (role == "seller") {
+      connectionCustomer.execute(
+        "SELECT SID FROM seller_account WHERE Username=?",
+        [username],
+        function (error, sellerID) {
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+            return;
+          } else {
+            console.log("SID->", sellerID[0].SID);
+            connectionLottery.execute(
+              "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename,y.SID, count(x.Number) AS Stock FROM lottery.singlelottery x JOIN customer.seller_account y on x.SID=y.SID and y.SID=" +
+                sellerID[0].SID +
+                " WHERE x.Status='Available' Group By x.Number, x.Draw, y.Storename",
+              function (error, S_lottery) {
+                console.log(S_lottery);
+                if (error) {
+                  res.json({
+                    status: "500IS",
+                    message: "Internal Server : " + error,
+                  });
+                  return;
+                } else {
+                  if (S_lottery.length > 0) {
+                    for (let i = 0; i < S_lottery.length; i++) {
+                      S_lottery[i]["pack"] = "N";
+                      Lottery.push(S_lottery[i]);
+                    }
+                  }
+                  connectionLottery.execute(
+                    "SELECT x.Number, x.Draw,x.Amount,x.Status,x.DrawDate, y.Storename,y.SID, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID and y.SID=" +
+                      sellerID[0].SID +
+                      " WHERE x.Status='Available' Group By x.Number, x.Draw, x.Amount, y.Storename",
+                    function (error, P_lottery) {
+                      console.log(P_lottery);
+                      if (error) {
+                        res.json({
+                          status: "500IS",
+                          message: "Internal Server : " + error,
+                        });
+                        return;
+                      } else {
+                        if (P_lottery.length > 0) {
+                          for (let i = 0; i < P_lottery.length; i++) {
+                            P_lottery[i]["pack"] = "Y";
+                            Lottery.push(P_lottery[i]);
+                          }
+                        }
+                        res.json({
+                          status: "200OK",
+                          message: "get lottery success",
+                          lottery: Lottery,
+                        });
+                      }
+                    }
+                  );
+                }
+              }
+            );
+          }
+        }
+      );
+    } else {
+      res.json({
+        status: "401UR",
+        message: "Unauthorized",
+      });
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
+const get_singleLottery = (req, res) => {
   try {
     connectionLottery.execute(
-      "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Status='Available' Group By x.Number, x.Draw, y.Storename" ,
+      "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Status='Available' Group By x.Number, x.Draw, y.Storename",
       function (error, S_lottery) {
         console.log(S_lottery);
         if (error) {
@@ -111,6 +193,11 @@ const get_singleLottery = (req,res) => {
           });
           return;
         } else {
+          if (S_lottery.length > 0) {
+            for (let i = 0; i < S_lottery.length; i++) {
+              S_lottery[i]["pack"] = "N";
+            }
+          }
           res.json({
             status: "200OK",
             message: "get single lottery success",
@@ -124,7 +211,7 @@ const get_singleLottery = (req,res) => {
   }
 };
 
-const get_packLottery = (req,res) => {
+const get_packLottery = (req, res) => {
   try {
     connectionLottery.execute(
       "SELECT x.Number, x.Draw,x.Amount,x.Status,x.DrawDate, y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Status='Available' Group By x.Number, x.Draw, x.Amount, y.Storename",
@@ -137,6 +224,10 @@ const get_packLottery = (req,res) => {
           });
           return;
         } else {
+          if (P_lottery.length > 0) {
+            for (let i = 0; i < P_lottery.length; i++) {
+              P_lottery[i]["pack"] = "Y";
+            }}
           res.json({
             status: "200OK",
             message: "get pack lottery success",
@@ -150,12 +241,76 @@ const get_packLottery = (req,res) => {
   }
 };
 
+const search_Lottery = (req,res) => {
+  try{
+    let lotterySearch = ""
+    let Lottery = []
+    if(req.body.SearchNumber != null){
+      for(let i=0;i < req.body.SearchNumber.length ; i++){
+        (req.body.SearchNumber[i] == "x") ? lotterySearch += "_" : lotterySearch += req.body.SearchNumber[i]
+      }
+      
+      console.log(lotterySearch)
+      connectionLottery.execute(
+        "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%"+ lotterySearch +"%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename",
+        function(error,S_lottery){
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+            return;
+          } else {
+            if (S_lottery.length > 0) {
+              for (let i = 0; i < S_lottery.length; i++) {
+                S_lottery[i]["pack"] = "N"
+                Lottery.push(S_lottery[i]);
+              }
+            }
+            connectionLottery.execute(
+              "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%"+ lotterySearch +"%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename",
+              function(error,P_lottery){
+                if (error) {
+                  res.json({
+                    status: "500IS",
+                    message: "Internal Server : " + error,
+                  });
+                  return;
+                } else {
+                  if (P_lottery.length > 0) {
+                    for (let i = 0; i < P_lottery.length; i++) {
+                      P_lottery[i]["pack"] = "Y"
+                      Lottery.push(P_lottery[i]);
+                    }
+                  }
+                  console.log(Lottery);
+                  res.json({
+                    status: "200OK",
+                    message: "get search lottery success!!",
+                    search_lottery: Lottery,
+                  });
+                }
+              }
+            );
+          }
+        }
+      );
+    }
+  }catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+}
+
+
 module.exports = {
   add_singleLottery,
   add_packLottery,
   get_singleLottery,
   get_packLottery,
+  get_lottery,
+  search_Lottery,
 };
+
 
 const countAddSingleLottery = async (req, res, results) => {
   let AddLottery = true;
@@ -169,7 +324,7 @@ const countAddSingleLottery = async (req, res, results) => {
         results[0].SID,
         moment(new Date()).format("YYYYMMDDHHmmssZZ"),
         element.DrawDate,
-        "Available"
+        "Available",
       ],
       async function (error) {
         if (error) {
@@ -223,7 +378,7 @@ const countAddPackLottery = async (req, res, results) => {
         moment(new Date()).format("YYYYMMDDHHmmssZZ"),
         element.Amount,
         element.DrawDate,
-        "Available"
+        "Available",
       ],
       async function (error) {
         if (error) {
