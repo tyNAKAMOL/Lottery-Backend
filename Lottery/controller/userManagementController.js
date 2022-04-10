@@ -16,46 +16,70 @@ const connectionCustomer = mysql.createConnection({
   database: "customer",
 });
 
+const validateMethod = (vd) => {
+  let errMsg = "";
+  for (const [key, value] of Object.entries(vd)) {
+    if (value == null || value == "") {
+      errMsg += key;
+    }
+  }
+  return errMsg;
+};
+
 const login = (req, res) => {
   console.log(req.body);
   try {
-    connectionUser.execute(
-      "SELECT * FROM user WHERE Username=?",
-      [req.body.Username],
-      function (error, users) {
-        console.log(users);
-        if (error) {
-          res.json({ status: "500IS", message: "Internal Server : " + error });
-          return;
-        }
-        if (users.length == 0) {
-          res.json({ status: "200NF", message: "No User Found" });
-          return;
-        }
-        bcrypt.compare(
-          req.body.Password,
-          users[0].Password,
-          function (error, isLogin) {
-            console.log(error);
-            if (isLogin) {
-              var token = jwt.sign(
-                { username: users[0].Username, role: users[0].Role },
-                secret,
-                {
-                  expiresIn: "1h",
-                }
-              );
-              res.json({ status: "200OK", message: "Login success", token });
-            } else {
-              res.json({
-                status: "200ER",
-                message: "Wrong Username or Password",
-              });
-            }
+    let validateData = {
+      Username: req.body.Username,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length == 0) {
+      connectionUser.execute(
+        "SELECT * FROM user WHERE Username=?",
+        [req.body.Username],
+        function (error, users) {
+          console.log(users);
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+            return;
           }
-        );
-      }
-    );
+          if (users.length == 0) {
+            res.json({ status: "200NF", message: "No User Found" });
+            return;
+          }
+          bcrypt.compare(
+            req.body.Password,
+            users[0].Password,
+            function (error, isLogin) {
+              console.log(error);
+              if (isLogin) {
+                var token = jwt.sign(
+                  { username: users[0].Username, role: users[0].Role },
+                  secret,
+                  {
+                    expiresIn: "1h",
+                  }
+                );
+                res.json({ status: "200OK", message: "Login success", token });
+              } else {
+                res.json({
+                  status: "200ER",
+                  message: "Wrong Username or Password",
+                });
+              }
+            }
+          );
+        }
+      );
+    } else {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+    }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
@@ -184,7 +208,11 @@ const register = (req, res, next) => {
                                     ) {
                                       connectionCustomer.execute(
                                         "UPDATE seller_account SET URLImage=? , Storename=?,Status='flow New Register' WHERE Username=?",
-                                        [req.body.URLImage,req.body.Firstname,req.body.Username],
+                                        [
+                                          req.body.URLImage,
+                                          req.body.Firstname,
+                                          req.body.Username,
+                                        ],
                                         function (error) {
                                           if (error) {
                                             res.json({
@@ -225,24 +253,38 @@ const register = (req, res, next) => {
 
 const logout = (req, res) => {
   console.log(req.body.token);
-  const decoded = jwt.verify(req.body.token, secret);
-  const { username } = decoded;
   try {
-    connectionUser.execute(
-      "SELECT * FROM user WHERE Username=?",
-      [username],
-      function (error, users, fields) {
-        if (error) {
-          res.json({ status: "500IS", message: "Internal Server : " + error });
-          return;
+    let validateData = {
+      token: req.body.token,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username } = decoded;
+      connectionUser.execute(
+        "SELECT * FROM user WHERE Username=?",
+        [username],
+        function (error, users, fields) {
+          if (error) {
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+            return;
+          }
+          if (users.length == 0) {
+            res.json({ status: "200NF", message: "no user found" });
+            return;
+          }
+          res.json({ status: "200OK", message: "Logout success" });
         }
-        if (users.length == 0) {
-          res.json({ status: "200NF", message: "no user found" });
-          return;
-        }
-        res.json({ status: "200OK", message: "Logout success" });
-      }
-    );
+      );
+    }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
@@ -250,194 +292,241 @@ const logout = (req, res) => {
 
 const customerUpdateAccount = (req, res) => {
   try {
-    const decoded = jwt.verify(req.body.token, secret);
-    const { username, role } = decoded;
-    if (role == "customer") {
-      connectionUser.execute(
-        "SELECT * FROM user WHERE Username=?",
-        [username],
-        function (error, users) {
-          if (error) {
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          }
-          if (users.length == 0) {
-            res.json({ status: "200NF", message: "No User Found" });
-            return;
-          } else {
-            if (req.params.action == "ChangeImage") {
-              connectionCustomer.execute(
-                "UPDATE customer_account SET URL_image_profile=? WHERE Username=? ",
-                [req.body.URL_image_profile, username],
-                function (error) {
-                  if (error) {
-                    res.json({
-                      status: "500IS",
-                      message: "Internal Server : " + error,
-                    });
-                    return;
-                  }
-                  res.json({
-                    status: "200OK",
-                    message: "Customer update URLImage success",
-                  });
-                }
-              );
-            } else if (req.params.action == "ChangeAccountInfo") {
-              connectionCustomer.execute(
-                "UPDATE customer_account SET Title=?,Firstname=?,Lastname=?,Email=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=? WHERE Username=?",
-                [
-                  req.body.Title,
-                  req.body.Firstname,
-                  req.body.Lastname,
-                  req.body.Email,
-                  req.body.Tel,
-                  req.body.Address.HomeNo,
-                  req.body.Address.Soi,
-                  req.body.Address.Road,
-                  req.body.Address.Subdistrict,
-                  req.body.Address.District,
-                  req.body.Address.Province,
-                  req.body.Address.ZipCode,
-                  username,
-                ],
-                function (error) {
-                  if (error) {
-                    res.json({
-                      status: "500IS",
-                      message: "Internal Server : " + error,
-                    });
-                    return;
-                  } else {
-                    res.json({
-                      status: "200OK",
-                      message: "Customer update account success",
-                    });
-                  }
-                }
-              );
-            }
-          }
-        }
-      );
+    let validateData = {
+      token: req.body.token,
+    };
+    if (req.params.action == "ChangeImage") {
+      validateData["URLImage_Profile"] = req.body.URL_image_profile;
+    } else if (req.params.action == "ChangeAccountInfo") {
     } else {
       res.json({
-        status: "401UR",
-        message: "Unauthorized",
+        status: "404UC",
+        message: "Unknown Command: " + req.params.action,
       });
+      return;
+    }
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+      return;
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      if (role == "customer") {
+        connectionUser.execute(
+          "SELECT * FROM user WHERE Username=?",
+          [username],
+          function (error, users) {
+            if (error) {
+              res.json({
+                status: "500IS",
+                message: "Internal Server : " + error,
+              });
+              return;
+            }
+            if (users.length == 0) {
+              res.json({ status: "200NF", message: "No User Found" });
+              return;
+            } else {
+              if (req.params.action == "ChangeImage") {
+                connectionCustomer.execute(
+                  "UPDATE customer_account SET URL_image_profile=? WHERE Username=? ",
+                  [req.body.URL_image_profile, username],
+                  function (error) {
+                    if (error) {
+                      res.json({
+                        status: "500IS",
+                        message: "Internal Server : " + error,
+                      });
+                      return;
+                    }
+                    res.json({
+                      status: "200OK",
+                      message: "Customer update URLImage success",
+                    });
+                  }
+                );
+              } else if (req.params.action == "ChangeAccountInfo") {
+                connectionCustomer.execute(
+                  "UPDATE customer_account SET Firstname=?,Lastname=?,Email=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=? WHERE Username=?",
+                  [
+                    req.body.Firstname,
+                    req.body.Lastname,
+                    req.body.Email,
+                    req.body.Tel,
+                    req.body.Address.HomeNo,
+                    req.body.Address.Soi,
+                    req.body.Address.Road,
+                    req.body.Address.Subdistrict,
+                    req.body.Address.District,
+                    req.body.Address.Province,
+                    req.body.Address.ZipCode,
+                    username,
+                  ],
+                  function (error) {
+                    if (error) {
+                      res.json({
+                        status: "500IS",
+                        message: "Internal Server : " + error,
+                      });
+                      return;
+                    } else {
+                      res.json({
+                        status: "200OK",
+                        message: "Customer update account success",
+                      });
+                    }
+                  }
+                );
+              }
+            }
+          }
+        );
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
     }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
 };
+
 const sellerUpdateAccount = (req, res) => {
   try {
-    const decoded = jwt.verify(req.body.token, secret);
-    const { username, role } = decoded;
-    if (role == "seller") {
-      connectionUser.execute(
-        "SELECT * FROM user WHERE Username=?",
-        [username],
-        function (error, users) {
-          if (error) {
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          }
-          if (users.length == 0) {
-            res.json({ status: "200NF", message: "No User Found" });
-            return;
-          } else {
-            if (req.params.action == "ChangeBankInfo") {
-              connectionCustomer.execute(
-                "UPDATE seller_account SET Bank_Account=?,Bank_Account_Number=?,Bank_Account_Name=? WHERE Username=? ",
-                [
-                  req.body.Bank_Account,
-                  req.body.Bank_Account_Number,
-                  req.body.Bank_Account_Name,
-                  username,
-                ],
-                function (error) {
-                  if (error) {
-                    res.json({
-                      status: "500IS",
-                      message: "Internal Server : " + error,
-                    });
-                    return;
-                  }
-                  res.json({
-                    status: "200OK",
-                    message: "Seller update bank success!!",
-                  });
-                }
-              );
-            } else if (req.params.action == "ChangeImage") {
-              connectionCustomer.execute(
-                "UPDATE seller_account SET URL_image_profile=? WHERE Username=? ",
-                [req.body.URL_image_profile, username],
-                function (error) {
-                  if (error) {
-                    res.json({
-                      status: "500IS",
-                      message: "Internal Server : " + error,
-                    });
-                    return;
-                  }
-                  res.json({
-                    status: "200OK",
-                    message: "Seller update URLImage success!!",
-                  });
-                }
-              );
-            } else if (req.params.action == "ChangeAccountInfo") {
-              connectionCustomer.execute(
-                "UPDATE seller_account SET Title=?,Firstname=?,Lastname=?,Email=?,Birthday=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=?,Storename=? WHERE Username=?",
-                [
-                  req.body.Title,
-                  req.body.Firstname,
-                  req.body.Lastname,
-                  req.body.Email,
-                  req.body.Birthday,
-                  req.body.Tel,
-                  req.body.Address.HomeNo,
-                  req.body.Address.Soi,
-                  req.body.Address.Road,
-                  req.body.Address.Subdistrict,
-                  req.body.Address.District,
-                  req.body.Address.Province,
-                  req.body.Address.ZipCode,
-                  req.body.Storename,
-                  username,
-                ],
-                function (error) {
-                  if (error) {
-                    res.json({
-                      status: "500IS",
-                      message: "Internal Server : " + error,
-                    });
-                    return;
-                  } else {
-                    res.json({
-                      status: "200OK",
-                      message: "Seller update account success!!",
-                    });
-                  }
-                }
-              );
-            }
-          }
-        }
-      );
+    let validateData = {
+      token: req.body.token,
+    };
+    if (req.params.action == "ChangeBankInfo") {
+      validateData["Bank_Account"] = req.body.Bank_Account;
+      validateData["Bank_Account_Number"] = req.body.Bank_Account_Number;
+      validateData["Bank_Account_Name"] = req.body.Bank_Account_Name;
+    } else if (req.params.action == "ChangeImage") {
+      validateData["URLImage_Profile"] = req.body.URL_image_profile;
+    } else if (req.params.action == "ChangeAccountInfo") {
     } else {
       res.json({
-        status: "401UR",
-        message: "Unauthorized",
+        status: "404UC",
+        message: "Unknown Command: " + req.params.action,
       });
+      return;
+    }
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      if (role == "seller") {
+        connectionUser.execute(
+          "SELECT * FROM user WHERE Username=?",
+          [username],
+          function (error, users) {
+            if (error) {
+              res.json({
+                status: "500IS",
+                message: "Internal Server : " + error,
+              });
+              return;
+            }
+            if (users.length == 0) {
+              res.json({ status: "200NF", message: "No User Found" });
+              return;
+            } else {
+              if (req.params.action == "ChangeBankInfo") {
+                connectionCustomer.execute(
+                  "UPDATE seller_account SET Bank_Account=?,Bank_Account_Number=?,Bank_Account_Name=? WHERE Username=? ",
+                  [
+                    req.body.Bank_Account,
+                    req.body.Bank_Account_Number,
+                    req.body.Bank_Account_Name,
+                    username,
+                  ],
+                  function (error) {
+                    if (error) {
+                      res.json({
+                        status: "500IS",
+                        message: "Internal Server : " + error,
+                      });
+                      return;
+                    }
+                    res.json({
+                      status: "200OK",
+                      message: "Seller update bank success!!",
+                    });
+                  }
+                );
+              } else if (req.params.action == "ChangeImage") {
+                connectionCustomer.execute(
+                  "UPDATE seller_account SET URL_image_profile=? WHERE Username=? ",
+                  [req.body.URL_image_profile, username],
+                  function (error) {
+                    if (error) {
+                      res.json({
+                        status: "500IS",
+                        message: "Internal Server : " + error,
+                      });
+                      return;
+                    }
+                    res.json({
+                      status: "200OK",
+                      message: "Seller update URLImage success!!",
+                    });
+                  }
+                );
+              } else if (req.params.action == "ChangeAccountInfo") {
+                connectionCustomer.execute(
+                  "UPDATE seller_account SET Title=?,Firstname=?,Lastname=?,Email=?,Birthday=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=?,Storename=? WHERE Username=?",
+                  [
+                    req.body.Title,
+                    req.body.Firstname,
+                    req.body.Lastname,
+                    req.body.Email,
+                    req.body.Birthday,
+                    req.body.Tel,
+                    req.body.Address.HomeNo,
+                    req.body.Address.Soi,
+                    req.body.Address.Road,
+                    req.body.Address.Subdistrict,
+                    req.body.Address.District,
+                    req.body.Address.Province,
+                    req.body.Address.ZipCode,
+                    req.body.Storename,
+                    username,
+                  ],
+                  function (error) {
+                    if (error) {
+                      res.json({
+                        status: "500IS",
+                        message: "Internal Server : " + error,
+                      });
+                      return;
+                    } else {
+                      res.json({
+                        status: "200OK",
+                        message: "Seller update account success!!",
+                      });
+                    }
+                  }
+                );
+              }
+            }
+          }
+        );
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
     }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
@@ -446,6 +535,18 @@ const sellerUpdateAccount = (req, res) => {
 
 const getCustomerAccount = (req, res) => {
   try {
+    let validateData = {
+      token: req.params.token,
+    };
+    const errMsg = validateMethod(validateData);
+    if(errMsg.length>0){
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+        return;
+    }
+    else{
     const decoded = jwt.verify(req.params.token, secret);
     const { username, role } = decoded;
     if (role == "customer") {
@@ -495,63 +596,75 @@ const getCustomerAccount = (req, res) => {
         status: "401UR",
         message: "Unauthorized",
       });
-    }
+    }}
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
 };
 const getSellerAccount = (req, res) => {
   try {
-    const decoded = jwt.verify(req.params.token, secret);
-    const { username, role } = decoded;
-    if (role == "seller") {
-      connectionCustomer.execute(
-        "select * from seller_account where username=?",
-        [username],
-        function (error, result) {
-          if (error) {
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          } else if (result.length == 0) {
-            res.json({
-              status: "200NF",
-              message: "username not found in seller account",
-            });
-          } else {
-            let seller = {
-              Firstname: result[0].Firstname,
-              Lastname: result[0].Lastname,
-              Tel: result[0].Tel,
-              Birthday: result[0].Birthday,
-              Email: result[0].Email,
-              Address: {
-                HomeNo: result[0].HomeNo,
-                Soi: result[0].Soi,
-                Road: result[0].Road,
-                Subdistrict: result[0].Subdistrict,
-                District: result[0].District,
-                Province: result[0].Province,
-                ZipCode: result[0].ZipCode,
-              },
-              Storename: result[0].Storename,
-              URLImage: result[0].URL_image_profile,
-            };
-            res.json({
-              status: "200OK",
-              message: "get data account success!!",
-              sellerAccount: seller,
-            });
-          }
-        }
-      );
-    } else {
+    let validateData = {
+      token: req.params.token,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
       res.json({
-        status: "401UR",
-        message: "Unauthorized",
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
       });
+      return;
+    } else {
+      const decoded = jwt.verify(req.params.token, secret);
+      const { username, role } = decoded;
+      if (role == "seller") {
+        connectionCustomer.execute(
+          "select * from seller_account where username=?",
+          [username],
+          function (error, result) {
+            if (error) {
+              res.json({
+                status: "500IS",
+                message: "Internal Server : " + error,
+              });
+              return;
+            } else if (result.length == 0) {
+              res.json({
+                status: "200NF",
+                message: "username not found in seller account",
+              });
+            } else {
+              let seller = {
+                Firstname: result[0].Firstname,
+                Lastname: result[0].Lastname,
+                Tel: result[0].Tel,
+                Birthday: result[0].Birthday,
+                Email: result[0].Email,
+                Address: {
+                  HomeNo: result[0].HomeNo,
+                  Soi: result[0].Soi,
+                  Road: result[0].Road,
+                  Subdistrict: result[0].Subdistrict,
+                  District: result[0].District,
+                  Province: result[0].Province,
+                  ZipCode: result[0].ZipCode,
+                },
+                Storename: result[0].Storename,
+                URLImage: result[0].URL_image_profile,
+              };
+              res.json({
+                status: "200OK",
+                message: "get data account success!!",
+                sellerAccount: seller,
+              });
+            }
+          }
+        );
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
     }
   } catch (error) {
     res.json({
@@ -563,43 +676,55 @@ const getSellerAccount = (req, res) => {
 
 const getBankSeller = (req, res) => {
   try {
-    const decoded = jwt.verify(req.params.token, secret);
-    const { username, role } = decoded;
-    if (role == "seller") {
-      connectionCustomer.execute(
-        "select * from seller_account where username=?",
-        [username],
-        function (error, result) {
-          if (error) {
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          } else if (result.length == 0) {
-            res.json({
-              status: "200NF",
-              message: "username not found in seller account",
-            });
-          } else {
-            let sellerBank = {
-              Bank_Account: result[0].Bank_Account,
-              Bank_Account_Name: result[0].Bank_Account_Name,
-              Bank_Account_Number: result[0].Bank_Account_Number,
-            };
-            res.json({
-              status: "200OK",
-              message: "get Seller Bank Success",
-              sellenBack: sellerBank,
-            });
-          }
-        }
-      );
-    } else {
+    let validateData = {
+      token: req.params.token,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
       res.json({
-        status: "401UR",
-        message: "Unauthorized",
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
       });
+      return;
+    } else {
+      const decoded = jwt.verify(req.params.token, secret);
+      const { username, role } = decoded;
+      if (role == "seller") {
+        connectionCustomer.execute(
+          "select * from seller_account where username=?",
+          [username],
+          function (error, result) {
+            if (error) {
+              res.json({
+                status: "500IS",
+                message: "Internal Server : " + error,
+              });
+              return;
+            } else if (result.length == 0) {
+              res.json({
+                status: "200NF",
+                message: "username not found in seller account",
+              });
+            } else {
+              let sellerBank = {
+                Bank_Account: result[0].Bank_Account,
+                Bank_Account_Name: result[0].Bank_Account_Name,
+                Bank_Account_Number: result[0].Bank_Account_Number,
+              };
+              res.json({
+                status: "200OK",
+                message: "get Seller Bank Success",
+                sellenBack: sellerBank,
+              });
+            }
+          }
+        );
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
     }
   } catch (error) {
     res.json({

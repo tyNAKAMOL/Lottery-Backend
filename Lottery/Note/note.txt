@@ -259,3 +259,23 @@ a% = word starting with a
 _ = position
 
 
+
+Map<String,Object> Validate
+
+{
+  "username": req.body.username,
+  "password": req.body.password
+}
+
+
+Validate Method ()
+String errMsg
+ loop Map
+    entry -> entry.key, entry.value
+  if(entry.value = null)
+  errMsg += entry.key
+
+Response 
+code:403
+devMsg: Missing or invalid Parameter: [errMsg]
+  

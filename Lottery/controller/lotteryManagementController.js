@@ -14,42 +14,65 @@ const connectionCustomer = mysql.createConnection({
   database: "customer",
 });
 
+const validateMethod = (vd) => {
+  let errMsg = "";
+  for (const [key, value] of Object.entries(vd)) {
+    if (value == null || value == "" || value == []) {
+      errMsg += key;
+    }
+  }
+  return errMsg;
+};
+
 const add_singleLottery = async (req, res) => {
   try {
-    const decoded = jwt.verify(req.body.token, secret);
-    const { username, role } = decoded;
-    if (role == "seller") {
-      connectionCustomer.execute(
-        "SELECT SID,Status FROM seller_account WHERE Username=? ",
-        [username],
-        async function (error, results) {
-          if (error) {
-            console.log("error SID");
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          } else {
-            const countAddLottery = await countAddSingleLottery(
-              req,
-              res,
-              results
-            );
-            if (countAddLottery == true) {
+    let validateData = {
+      token: req.body.token,
+      lotteryList: req.body.lotteryList,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + Msg,
+      });
+      return;
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      if (role == "seller") {
+        connectionCustomer.execute(
+          "SELECT SID,Status FROM seller_account WHERE Username=? ",
+          [username],
+          async function (error, results) {
+            if (error) {
+              console.log("error SID");
               res.json({
-                status: "200OK",
-                message: "Add single lottery to store success!!",
+                status: "500IS",
+                message: "Internal Server : " + error,
               });
+              return;
+            } else {
+              const countAddLottery = await countAddSingleLottery(
+                req,
+                res,
+                results
+              );
+              if (countAddLottery == true) {
+                res.json({
+                  status: "200OK",
+                  message: "Add single lottery to store success!!",
+                });
+              }
             }
           }
-        }
-      );
-    } else {
-      res.json({
-        status: "401UR",
-        message: "Unauthorized",
-      });
+        );
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
     }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
@@ -227,7 +250,8 @@ const get_packLottery = (req, res) => {
           if (P_lottery.length > 0) {
             for (let i = 0; i < P_lottery.length; i++) {
               P_lottery[i]["pack"] = "Y";
-            }}
+            }
+          }
           res.json({
             status: "200OK",
             message: "get pack lottery success",
@@ -241,19 +265,23 @@ const get_packLottery = (req, res) => {
   }
 };
 
-const search_Lottery = (req,res) => {
-  try{
-    let lotterySearch = ""
-    let Lottery = []
-    if(req.body.SearchNumber != null){
-      for(let i=0;i < req.body.SearchNumber.length ; i++){
-        (req.body.SearchNumber[i] == "x") ? lotterySearch += "_" : lotterySearch += req.body.SearchNumber[i]
+const search_Lottery = (req, res) => {
+  try {
+    let lotterySearch = "";
+    let Lottery = [];
+    if (req.body.SearchNumber != null) {
+      for (let i = 0; i < req.body.SearchNumber.length; i++) {
+        req.body.SearchNumber[i] == "x"
+          ? (lotterySearch += "_")
+          : (lotterySearch += req.body.SearchNumber[i]);
       }
-      
-      console.log(lotterySearch)
+
+      console.log(lotterySearch);
       connectionLottery.execute(
-        "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%"+ lotterySearch +"%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename",
-        function(error,S_lottery){
+        "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.singlelottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%" +
+          lotterySearch +
+          "%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename",
+        function (error, S_lottery) {
           if (error) {
             res.json({
               status: "500IS",
@@ -263,13 +291,15 @@ const search_Lottery = (req,res) => {
           } else {
             if (S_lottery.length > 0) {
               for (let i = 0; i < S_lottery.length; i++) {
-                S_lottery[i]["pack"] = "N"
+                S_lottery[i]["pack"] = "N";
                 Lottery.push(S_lottery[i]);
               }
             }
             connectionLottery.execute(
-              "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%"+ lotterySearch +"%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename",
-              function(error,P_lottery){
+              "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%" +
+                lotterySearch +
+                "%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename",
+              function (error, P_lottery) {
                 if (error) {
                   res.json({
                     status: "500IS",
@@ -279,7 +309,7 @@ const search_Lottery = (req,res) => {
                 } else {
                   if (P_lottery.length > 0) {
                     for (let i = 0; i < P_lottery.length; i++) {
-                      P_lottery[i]["pack"] = "Y"
+                      P_lottery[i]["pack"] = "Y";
                       Lottery.push(P_lottery[i]);
                     }
                   }
@@ -296,11 +326,10 @@ const search_Lottery = (req,res) => {
         }
       );
     }
-  }catch (error) {
+  } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
-}
-
+};
 
 module.exports = {
   add_singleLottery,
@@ -311,54 +340,58 @@ module.exports = {
   search_Lottery,
 };
 
-
 const countAddSingleLottery = async (req, res, results) => {
   let AddLottery = true;
   await req.body.lotteryList.forEach(async (element) => {
-    await connectionLottery.execute(
-      "INSERT INTO singlelottery (Number,Lot,Draw,SID,Date,DrawDate,Status) VALUES (?,?,?,?,?,?,?)",
-      [
-        element.Number,
-        element.Lot,
-        element.Draw,
-        results[0].SID,
-        moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-        element.DrawDate,
-        "Available",
-      ],
-      async function (error) {
-        if (error) {
-          connectionLottery.execute(
-            "DELETE FROM singlelottery WHERE SID=? and Date BETWEEN ? and ?",
-            [
-              results[0].SID,
-              moment(new Date())
-                .subtract(20, "seconds")
-                .format("YYYYMMDDHHmmssZZ"),
-              moment(new Date()).add(20, "seconds").format("YYYYMMDDHHmmssZZ"),
-            ],
-            function (error) {
-              if (error) {
-                console.log("error add single lottery");
-                res.json({
-                  status: "500IS",
-                  message: "Internal Server : " + error,
-                });
-                AddLottery = false;
-                return AddLottery;
+    if(element.Number != null && element.Lot != null && element.Draw != null && element.DrawDate != null){
+      await connectionLottery.execute(
+        "INSERT INTO singlelottery (Number,Lot,Draw,SID,Date,DrawDate,Status) VALUES (?,?,?,?,?,?,?)",
+        [
+          element.Number,
+          element.Lot,
+          element.Draw,
+          results[0].SID,
+          moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+          element.DrawDate,
+          "Available",
+        ],
+        async function (error) {
+          if (error) {
+            connectionLottery.execute(
+              "DELETE FROM singlelottery WHERE SID=? and Date BETWEEN ? and ?",
+              [
+                results[0].SID,
+                moment(new Date())
+                  .subtract(20, "seconds")
+                  .format("YYYYMMDDHHmmssZZ"),
+                moment(new Date()).add(20, "seconds").format("YYYYMMDDHHmmssZZ"),
+              ],
+              function (error) {
+                if (error) {
+                  console.log("error add single lottery");
+                  res.json({
+                    status: "500IS",
+                    message: "Internal Server : " + error,
+                  });
+                  AddLottery = false;
+                  return AddLottery;
+                }
               }
-            }
-          );
-          console.log("error add single lottery");
-          res.json({
-            status: "500IS",
-            message: "Internal Server : " + error,
-          });
-          AddLottery = false;
-          return AddLottery;
+            );
+            console.log("error add single lottery");
+            res.json({
+              status: "500IS",
+              message: "Internal Server : " + error,
+            });
+            AddLottery = false;
+            return AddLottery;
+          }
         }
-      }
-    );
+      );
+    }else{
+
+    }
+    
     console.log("in loop");
   });
   console.log("in function", AddLottery);
