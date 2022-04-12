@@ -16,6 +16,12 @@ const connectionCustomer = mysql.createConnection({
   database: "customer",
 });
 
+const connectionAdmin = mysql.createConnection({
+  host: "localhost",
+  user: "root",
+  database: "admin",
+});
+
 const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
@@ -207,7 +213,7 @@ const register = (req, res, next) => {
                                       req.body.wantToBeSeller == true
                                     ) {
                                       connectionCustomer.execute(
-                                        "UPDATE seller_account SET URLImage=? , Storename=?,Status='flow New Register' WHERE Username=?",
+                                        "UPDATE seller_account SET URLImage=? , Storename=?,Status='sellerIdentity' WHERE Username=?",
                                         [
                                           req.body.URLImage,
                                           req.body.Firstname,
@@ -251,6 +257,52 @@ const register = (req, res, next) => {
   }
 };
 
+const registerAdmin = (req, res) => {
+  bcrypt.hash(req.body.Password, saltRounds, function (error, hash) {
+    connectionUser.execute(
+      "INSERT INTO user (Username,Password,Role) VALUES (?,?,?)",
+      [req.body.Username, hash, req.body.Role],
+      function (error) {
+        if (error) {
+          res.json({
+            status: "500IS",
+            message: "Internal Server : " + error,
+          });
+          return;
+        } else {
+          connectionAdmin.execute(
+            "INSERT INTO account (Title,Firstname,Lastname,Username,Email,Birthday,Tel,HomeNo,Soi,Road,Subdistrict,District,Province,ZipCode,IDCard,URL_image_profile) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            [
+              req.body.Title,
+              req.body.Firstname,
+              req.body.Lastname,
+              req.body.Username,
+              req.body.Email,
+              req.body.Birthday,
+              req.body.Tel,
+              req.body.Address.HomeNo,
+              req.body.Address.Soi,
+              req.body.Address.Road,
+              req.body.Address.Subdistrict,
+              req.body.Address.District,
+              req.body.Address.Province,
+              req.body.Address.ZipCode,
+              req.body.IDCard,
+              req.body.URLImage,
+            ],
+            function (error) {
+              console.log(error)
+              res.json({
+                status: "200OK",
+                message: "Register admin Success!!",
+              });
+            }
+          );
+        }
+      }
+    );
+  });
+};
 const logout = (req, res) => {
   console.log(req.body.token);
   try {
@@ -539,64 +591,64 @@ const getCustomerAccount = (req, res) => {
       token: req.params.token,
     };
     const errMsg = validateMethod(validateData);
-    if(errMsg.length>0){
+    if (errMsg.length > 0) {
       res.json({
         status: "403MP",
         message: "Missing or Invalid Parameter : " + errMsg,
       });
-        return;
-    }
-    else{
-    const decoded = jwt.verify(req.params.token, secret);
-    const { username, role } = decoded;
-    if (role == "customer") {
-      connectionCustomer.execute(
-        "select * from customer_account where username=?",
-        [username],
-        function (error, result) {
-          if (error) {
-            res.json({
-              status: "500IS",
-              message: "Internal Server : " + error,
-            });
-            return;
-          } else if (result.length == 0) {
-            res.json({
-              status: "200NF",
-              message: "username not found in customer account",
-            });
-          } else {
-            let customer = {
-              Firstname: result[0].Firstname,
-              Lastname: result[0].Lastname,
-              Tel: result[0].Tel,
-              Birthday: result[0].Birthday,
-              Email: result[0].Email,
-              Address: {
-                HomeNo: result[0].HomeNo,
-                Soi: result[0].Soi,
-                Road: result[0].Road,
-                Subdistrict: result[0].Subdistrict,
-                District: result[0].District,
-                Province: result[0].Province,
-                ZipCode: result[0].ZipCode,
-              },
-              URLImage_Profile: result[0].URL_image_profile,
-            };
-            res.json({
-              status: "200OK",
-              message: "get data account success!!",
-              sellerAccount: customer,
-            });
-          }
-        }
-      );
+      return;
     } else {
-      res.json({
-        status: "401UR",
-        message: "Unauthorized",
-      });
-    }}
+      const decoded = jwt.verify(req.params.token, secret);
+      const { username, role } = decoded;
+      if (role == "customer") {
+        connectionCustomer.execute(
+          "select * from customer_account where username=?",
+          [username],
+          function (error, result) {
+            if (error) {
+              res.json({
+                status: "500IS",
+                message: "Internal Server : " + error,
+              });
+              return;
+            } else if (result.length == 0) {
+              res.json({
+                status: "200NF",
+                message: "username not found in customer account",
+              });
+            } else {
+              let customer = {
+                Firstname: result[0].Firstname,
+                Lastname: result[0].Lastname,
+                Tel: result[0].Tel,
+                Birthday: result[0].Birthday,
+                Email: result[0].Email,
+                Address: {
+                  HomeNo: result[0].HomeNo,
+                  Soi: result[0].Soi,
+                  Road: result[0].Road,
+                  Subdistrict: result[0].Subdistrict,
+                  District: result[0].District,
+                  Province: result[0].Province,
+                  ZipCode: result[0].ZipCode,
+                },
+                URLImage_Profile: result[0].URL_image_profile,
+              };
+              res.json({
+                status: "200OK",
+                message: "get data account success!!",
+                sellerAccount: customer,
+              });
+            }
+          }
+        );
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
+    }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
@@ -743,6 +795,7 @@ module.exports = {
   getBankSeller,
   getCustomerAccount,
   customerUpdateAccount,
+  registerAdmin,
 };
 
 const CheckUsernameEmailError = (results, req, res) => {

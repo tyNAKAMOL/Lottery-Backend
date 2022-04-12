@@ -8,11 +8,13 @@ const {
   getBankSeller,
   getCustomerAccount,
   customerUpdateAccount,
+  registerAdmin,
 } = require("../controller/userManagementController");
 
 const router = express.Router();
 
 router.post("/register", register);
+router.post("/registerAdmin", registerAdmin);
 router.post("/login", login);
 router.post("/logout", logout);
 router.get("/getSellerAccount/:token", getSellerAccount);

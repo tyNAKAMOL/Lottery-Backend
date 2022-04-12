@@ -7,6 +7,7 @@ var bodyParser = require("body-parser");
 const userManagementRoutes = require("./routes/userManagementRoutes");
 const orderManagementRoutes = require("./routes/orderManagementRoutes");
 const lotteryManagementRoutes = require("./routes/lotteryManagementRoutes");
+const adminManagementRoutes = require("./routes/adminManagementRoutes");
 
 var app = express();
 app.use(cors());
@@ -15,6 +16,7 @@ app.use(bodyParser.json());
 app.use(userManagementRoutes.routes);
 app.use(orderManagementRoutes.routes);
 app.use(lotteryManagementRoutes.routes);
+app.use(adminManagementRoutes.routes);
 
 app.use(router).listen(3333, function () {
   console.log("Server Started...");

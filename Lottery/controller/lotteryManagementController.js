@@ -291,7 +291,7 @@ const countAddSingleLottery = async (req, res, results) => {
           // console.log(element)
         }
       }
-      if(errInLotteryList.length>0){
+      if(errInLotteryList.length > 0){
         // console.log(errInLotteryList)
         res.json({
           status: "403MP",
