@@ -653,6 +653,7 @@ const getCustomerAccount = (req, res) => {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
 };
+
 const getSellerAccount = (req, res) => {
   try {
     let validateData = {
