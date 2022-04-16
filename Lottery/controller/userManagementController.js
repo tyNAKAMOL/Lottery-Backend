@@ -303,6 +303,7 @@ const registerAdmin = (req, res) => {
     );
   });
 };
+
 const logout = (req, res) => {
   console.log(req.body.token);
   try {
@@ -637,7 +638,7 @@ const getCustomerAccount = (req, res) => {
               res.json({
                 status: "200OK",
                 message: "get data account success!!",
-                sellerAccount: customer,
+                customerAccount: customer,
               });
             }
           }

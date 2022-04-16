@@ -35,7 +35,7 @@ const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
     if (value == null || value == "") {
-      errMsg += key;
+      errMsg += key+" ";
     }
   }
   return errMsg;
@@ -251,12 +251,15 @@ const getOrderPayment = async (req, res) => {
     });
   }
 };
+
 const updateOrderPayment = async (req, res) => {
   try {
     let validateData = {
-      token: req.body.token,
-      approve: req.body.approve, 
-      money: req.body.Money, 
+      token : req.body.token,
+      approve : req.body.approve, 
+      money : req.body.money, 
+      orderID : req.body.orderID,
+      customerID : req.body.customerID,
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
@@ -279,14 +282,19 @@ const updateOrderPayment = async (req, res) => {
               "UPDATE order_c SET Status=? WHERE OID=? and CID=? and Status='Audit Payment' ",
               ["Seller Check Order", req.body.orderID,req.body.customerID]
             );
-            await sendInbox({
-              Subject: "ตรวจสอบรายการคำสั่งซื้อที่ " + req.body.orderID ,
-              Detail: "กรุณาตรวจสอบคำสั่งซื้อที่ " + req.body.orderID + "ที่หน้าตรวจสอบคำสั่งซื้อ และกดปุ่มยืนยันเพื่อทำการยืนยันคำสั่งซื้อ หรือกดปุ่มยกเลิกเพิ้อทำการยกเลิกคำสั่งซื้อ ขอขอบคุณ",
-              Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-              CID: "",
-              SID: req.body.sellerID,
-              AID: adminID[0].AID,
-            });
+            const [sellerID] = await promiseOrder.execute(
+              "SELECT DISTINCT SID FROM transaction WHERE OID=?",[req.body.orderID]
+            )
+            for(let i = 0; i < sellerID.length ;i++){
+              await sendInbox({
+                Subject: "ตรวจสอบรายการคำสั่งซื้อที่ " + req.body.orderID ,
+                Detail: "กรุณาตรวจสอบคำสั่งซื้อที่ " + req.body.orderID + " ที่หน้าตรวจสอบคำสั่งซื้อ และกดปุ่มยืนยันเพื่อทำการยืนยันคำสั่งซื้อ หรือกดปุ่มยกเลิกเพิ้อทำการยกเลิกคำสั่งซื้อ ขอขอบคุณ",
+                Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+                CID: "",
+                SID: sellerID[i].SID,
+                AID: adminID[0].AID,
+              });
+            }
             await addTransactionAdmin({
               Event:
                 "Approved Payment Order: [ " + req.body.orderID + " ]",
@@ -299,7 +307,6 @@ const updateOrderPayment = async (req, res) => {
               "UPDATE order_c SET URLSlip='', Status='Pending Payment' WHERE Status='Audit Payment' and OID=?",
               [req.body.OrderID]
             );
-            //....
             await sendInbox({
               Subject: "คำสั่งซื้อที่ "+ req.body.orderID + "ชำระเงินไม่สำเร็จ",
               Detail:
@@ -368,5 +375,6 @@ const getName = async (ID,role,key) => {
 module.exports = {
   getSellerIdentity,
   updateStatusSeller,
-  getOrderPayment
+  getOrderPayment,
+  updateOrderPayment
 };

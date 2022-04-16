@@ -34,7 +34,7 @@ const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
     if (value == null || value == "" || value == []) {
-      errMsg += key;
+      errMsg += key + " ";
     }
   }
   return errMsg;
@@ -155,7 +155,10 @@ const update_cart = async (req, res) => {
           "SELECT CID FROM customer_account WHERE Username=? ",
           [username]
         );
-        if (req.body.errorOrderList.length != 0 && customerID[0].CID != undefined) {
+        if (
+          req.body.errorOrderList.length != 0 &&
+          customerID[0].CID != undefined
+        ) {
           for (let i = 0; i < req.body.errorOrderList.length; i++) {
             const [orderInCart] = await promiseOrder.execute(
               "SELECT Number_lottery , Amount FROM cart WHERE CID = ? and Number_lottery = ? and SID=?",
@@ -223,7 +226,7 @@ const delete_cart = async (req, res) => {
           "SELECT * FROM seller_account WHERE Storename=? ",
           [req.body.Storename]
         );
-        if(customerID != undefined && sellerID != undefined){
+        if (customerID != undefined && sellerID != undefined) {
           await promiseOrder.execute(
             "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=?",
             [req.body.Number_lottery, sellerID[0].SID, customerID[0].CID]
@@ -233,7 +236,7 @@ const delete_cart = async (req, res) => {
             message: "customer remove lottery from cart success!!",
           });
         }
-        }
+      }
     }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
@@ -242,17 +245,45 @@ const delete_cart = async (req, res) => {
 
 const confirmed_order = async (req, res) => {
   try {
-    let validateData = {
+    let validateToken = {
       token: req.body.token,
     };
-    const errMsg = validateMethod(validateData);
-    if (errMsg.length > 0) {
+    let errMsgCart = "";
+    let validateDataInCart = [];
+    //  console.log(req.body.lotteryList);
+    for (const element of req.body.lotteryList) {
+      // validateDataInCart.push({
+      //   storeName : element.storeName,
+      //   Number : element.Number_lottery,
+      //   Draw : element.Draw,
+      //   DrawDate : element.DrawDate,
+      //   Pack : element.Pack,
+      //   Amount : element.Amount,
+      //   Money : element.Money
+      // })
+
+      let param = {
+        storeName: element.Storename,
+        Number: element.Number,
+        Draw: element.Draw,
+        DrawDate: element.DrawDate,
+        Pack: element.pack,
+        Amount: element.Amount,
+        Money: element.Money,
+      };
+      errMsgCart += validateMethod(param);
+    }
+    const errMsg = validateMethod(validateToken);
+    if (errMsg.length > 0 || errMsgCart.length > 0) {
       res.json({
         status: "403MP",
-        message: "Missing or Invalid Parameter : " + errMsg,
+        message: "Missing or Invalid Parameter : " + errMsg + errMsgCart,
       });
       return;
     } else {
+      var sellerMap = new Map();
+
+      // let List_ = []
       const decoded = jwt.verify(req.body.token, secret);
       const { username, role } = decoded;
       if (role == "customer") {
@@ -260,37 +291,96 @@ const confirmed_order = async (req, res) => {
           "SELECT CID FROM customer_account WHERE Username=?",
           [username]
         );
-        let params = {
-          OrderDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-          Payment: "Transfer",
-          Money: req.body.Money,
-          Status: "Order Confirmed",
-          customerID: results[0].CID,
-        };
-        let addOrder = checkAddOrder(req, res, params);
-        if (addOrder) {
-          console.log("CID", results);
-          const [OID] = await promiseOrder.execute(
-            "SELECT OID FROM order_c WHERE Status='Order Confirmed' and CID=?",
-            [results[0].CID]
-          );
-          console.log("OID", OID);
-          const [orderInCart] = await promiseOrder.execute(
-            "SELECT * FROM cart WHERE CID=?",
-            [results[0].CID]
-          );
-          console.log("orderInCart", orderInCart);
-          if(OID[0].OID != undefined && orderInCart != undefined){
-            const infoOrderList_ = await OrderConfirmedLottery(
-              req,
-              res,
-              orderInCart,
-              OID[0].OID
-            );
-            console.log("infoOrderList -> ", infoOrderList_);
-            await confirmedPayment(req, res, infoOrderList_, OID[0].OID);
+        for (let element of req.body.lotteryList) {
+          let sellerMapList = [];
+          if (sellerMap.has(element.Storename)) {
+            sellerMapList = sellerMap.get(element.Storename);
+            sellerMapList.push({
+              Number: element.Number,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
+              Pack: element.pack,
+              Amount: element.Amount,
+              Money: element.Money,
+            });
+            sellerMap.set(element.Storename, sellerMapList);
+          } else {
+            sellerMapList.push({
+              Number: element.Number,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
+              Pack: element.pack,
+              Amount: element.Amount,
+              Money: element.Money,
+            });
+            sellerMap.set(element.Storename, sellerMapList);
           }
         }
+        let subTotal = 0;
+        let firstShippingCharge = true;
+        let firstOrder = true;
+        let relatedID = "";
+        let shippingCost = "";
+        for (const [key, value] of sellerMap.entries()) {
+          if (value.length > 1) {
+            for (let i = 0; i < value.length; i++) {
+              subTotal += parseInt(value[i].Money);
+            }
+          } else {
+            subTotal = parseInt(value[0].Money);
+          }
+
+          if (req.body.delivery == "Yes" && firstShippingCharge) {
+            shippingCost = "40";
+            firstShippingCharge = false;
+          } else {
+            shippingCost = "-";
+          }
+
+          let params = {
+            OrderDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+            Payment: "Transfer",
+            Money: String(subTotal),
+            Status: "Order Confirmed",
+            customerID: results[0].CID,
+            ShippingCost: shippingCost,
+            relatedID: relatedID,
+          };
+          let addOrder = await checkAddOrder(req, res, params);
+          if (addOrder.flag && addOrder.OID != "" && firstOrder) {
+            relatedID = addOrder.OID;
+            firstOrder = false;
+          }
+        }
+        //console.logoney);
+
+        // if (addOrder) {
+        //   console.log("CID", results);
+        //   const [OID] = await promiseOrder.execute(
+        //     "SELECT OID FROM order_c WHERE Status='Order Confirmed' and CID=?",
+        //     [results[0].CID]
+        //   );
+        //   console.log("OID", OID);
+        //   const [orderInCart] = await promiseOrder.execute(
+        //     "SELECT * FROM cart WHERE CID=?",
+        //     [results[0].CID]
+        //   );
+        //   console.log("orderInCart", orderInCart);
+        //   if(OID[0].OID != undefined && orderInCart != undefined){
+        //     const infoOrderList_ = await OrderConfirmedLottery(
+        //       req,
+        //       res,
+        //       orderInCart,
+        //       OID[0].OID
+        //     );
+        //     console.log("infoOrderList -> ", infoOrderList_);
+        //     await confirmedPayment(req, res, infoOrderList_, OID[0].OID);
+        //   }
+        // }
+        res.json({
+          status: "200OK",
+          message: "success",
+        });
       } else {
         res.json({
           status: "401UR",
@@ -307,9 +397,9 @@ const update_URLSlip = async (req, res) => {
   const lotteryList = [];
   try {
     let validateData = {
-      token : req.body.token,
-      OrderID : req.body.OrderID,
-      URLSlip : req.body.URLSlip
+      token: req.body.token,
+      OrderID: req.body.OrderID,
+      URLSlip: req.body.URLSlip,
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
@@ -319,57 +409,209 @@ const update_URLSlip = async (req, res) => {
       });
       return;
     } else {
-    const decoded = jwt.verify(req.body.token, secret);
-    const { username, role } = decoded;
-    if (role == "customer") {
-      const [status] = await promiseOrder.execute(
-        "SELECT Status,CID FROM order_c WHERE OID=?",
-        [req.body.OrderID]
-      );
-      if (status[0].Status == "Pending Payment") {
-        await promiseOrder.execute(
-          "UPDATE order_c SET URLSlip=?, Status='Audit Payment' WHERE Status='Pending Payment' and OID=?",
-          [req.body.URLSlip, req.body.OrderID]
-        );
-        const [single] = await promiseLottery.execute(
-          "SELECT * FROM singlelottery WHERE OID=?",
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      if (role == "customer") {
+        const [status] = await promiseOrder.execute(
+          "SELECT Status,CID FROM order_c WHERE OID=?",
           [req.body.OrderID]
         );
-        const [pack] = await promiseLottery.execute(
-          "SELECT * FROM packlottery WHERE OID=?",
-          [req.body.OrderID]
-        );
-        if (single.length > 0) {
-          for (let i = 0; i < single.length; i++) {
-            lotteryList.push(single[i]);
+        if (status[0].Status == "Pending Payment") {
+          await promiseOrder.execute(
+            "UPDATE order_c SET URLSlip=?, Status='Audit Payment' WHERE Status='Pending Payment' and OID=?",
+            [req.body.URLSlip, req.body.OrderID]
+          );
+          const [single] = await promiseLottery.execute(
+            "SELECT * FROM singlelottery WHERE OID=?",
+            [req.body.OrderID]
+          );
+          const [pack] = await promiseLottery.execute(
+            "SELECT * FROM packlottery WHERE OID=?",
+            [req.body.OrderID]
+          );
+          if (single.length > 0) {
+            for (let i = 0; i < single.length; i++) {
+              lotteryList.push(single[i]);
+            }
           }
-        }
-        if (pack.length > 0) {
-          for (let i = 0; i < pack.length; i++) {
-            lotteryList.push(pack[i]);
+          if (pack.length > 0) {
+            for (let i = 0; i < pack.length; i++) {
+              lotteryList.push(pack[i]);
+            }
           }
-        }
-        console.log(lotteryList);
-        let addTransaction = await checkAddTransaction(req,res,lotteryList); 
-        if(addTransaction){
-          await promiseOrder.execute("DELETE FROM cart WHERE CID=?", [
-            status[0].CID,
-          ]);
+          console.log(lotteryList);
+          let addTransaction = await checkAddTransaction(req, res, lotteryList);
+          if (addTransaction) {
+            await promiseOrder.execute("DELETE FROM cart WHERE CID=?", [
+              status[0].CID,
+            ]);
+            res.json({
+              status: "200OK", //can update
+              message: "update URLSlip success!!",
+            });
+          }
+        } else {
           res.json({
-            status: "200OK", //can update
-            message: "update URLSlip success!!",
+            status: "200CU", //cannot update
+            message:
+              "cannot update URLSlip because orderStatus: " + status[0].Status,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
+const getSellerCheckOrder = async (req, res) => {
+  try {
+    let order = [];
+    let validateData = {
+      token: req.params.token, //seller
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+      return;
+    } else {
+      const decoded = jwt.verify(req.params.token, secret);
+      const { username, role } = decoded;
+      if (role == "seller") {
+        const [SID] = await promiseCustomer.execute(
+          "SELECT SID FROM seller_account WHERE Username=?",
+          [username]
+        );
+        const [result] = await promiseOrder.execute(
+          "SELECT * FROM order_c INNER JOIN transaction on order_c.OID = transaction.OID where transaction.SID = ?",
+          [SID[0].SID]
+        );
+        if (result.length == 0) {
+          res.json({
+            status: "200NF",
+            message: "not found in order",
+          });
+        } else {
+          for (let i = 0; i < result.length; i++) {
+            order.push({
+              orderID: result[i].OID,
+              customerID: result[i].CID,
+              nameCustomer: await getName(result[i].CID, "customer", "CID"),
+              Number: result[i].Number_lottery,
+              Lot: result[i].Lot,
+              Draw: result[i].Draw,
+            });
+          }
+          res.json({
+            status: "200OK",
+            message: "get orderPayment success!!",
+            orderPayment: order,
           });
         }
       } else {
         res.json({
-          status: "200CU", //cannot update
-          message:
-            "cannot update URLSlip because orderStatus: " + status[0].Status,
+          status: "401UR",
+          message: "Unauthorized",
         });
       }
-    }}
+    }
   } catch (error) {
-    res.json({ status: "500IS", message: "Internal Server : " + error });
+    res.json({
+      status: "500IS",
+      message: "Internal Server : " + error,
+    });
+  }
+};
+
+const sellerCheckOrder = async (req, res) => {
+  try {
+    let validateData = {
+      token: req.body.token,
+      approve: req.body.approve,
+      money: req.body.money,
+      orderID: req.body.orderID,
+      customerID: req.body.customerID,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+      return;
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      // const [adminID] = await promiseAdmin.execute(
+      //   "SELECT AID FROM account WHERE Username=?",
+      //   [username]
+      // );
+      // if (adminID != undefined) {
+      if (role == "seller") {
+        if (req.body.approve == "Yes") {
+          // await promiseOrder.execute(
+          //   "UPDATE order_c SET Status=? WHERE OID=? and CID=? and Status='Seller Check Order' ",
+          //   ["Seller Send Lottery", req.body.orderID , req.body.customerID]
+          // );
+          // const [sellerID] = await promiseOrder.execute(
+          //   "SELECT DISTINCT SID FROM transaction WHERE OID=?",[req.body.orderID]
+          // )
+          // for(let i = 0; i < sellerID.length ;i++){
+          //   await sendInbox({
+          //     Subject: "ตรวจสอบรายการคำสั่งซื้อที่ " + req.body.orderID ,
+          //     Detail: "กรุณาตรวจสอบคำสั่งซื้อที่ " + req.body.orderID + " ที่หน้าตรวจสอบคำสั่งซื้อ และกดปุ่มยืนยันเพื่อทำการยืนยันคำสั่งซื้อ หรือกดปุ่มยกเลิกเพิ้อทำการยกเลิกคำสั่งซื้อ ขอขอบคุณ",
+          //     Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+          //     CID: "",
+          //     SID: sellerID[i].SID,
+          //     AID: adminID[0].AID,
+          //   });
+          // }
+          await addTransactionAdmin({
+            Event: "Approved Payment Order: [ " + req.body.orderID + " ]",
+            actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+            AID: adminID[0].AID,
+          });
+        } else {
+          await promiseOrder.execute(
+            "UPDATE order_c SET URLSlip='', Status='Pending Payment' WHERE Status='Audit Payment' and OID=?",
+            [req.body.OrderID]
+          );
+          await sendInbox({
+            Subject: "คำสั่งซื้อที่ " + req.body.orderID + "ชำระเงินไม่สำเร็จ",
+            Detail:
+              "ทางเราได้ทำการตรวจสอบหลักฐานการชำระเงินของคุณ " +
+              (await getName(req.body.customerID, "customer", "CID")) +
+              " ทางเราไม่สามารถอนุมัติหลักฐานการชำระเงินได้เนื่องจากหลักฐานการชำระเงินรูปภาพไม่ชัดเจนหรือชำระเงินไม่ถูกต้อง กรุณาชำระเงินให้ครบจำนวนเงิน/ส่งหลักฐานการชำระเงินใหม่ หากมีข้อสงสัยติดต่อที่ Admin ขอขอบคุณ",
+            Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+            CID: req.body.customerID,
+            SID: "",
+            AID: adminID[0].AID,
+          });
+          await addTransactionAdmin({
+            Event:
+              "Reject Payment Order [ " +
+              req.body.orderID +
+              "]" +
+              " Because customer payment incompleted.",
+            actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+            AID: adminID[0].AID,
+          });
+        }
+        res.json({
+          status: "200OK",
+          message: "Success",
+        });
+      }
+    }
+    // }
+  } catch (error) {
+    res.json({
+      status: "500IS",
+      message: "Internal Server : " + error,
+    });
   }
 };
 
@@ -380,6 +622,16 @@ module.exports = {
   delete_cart,
   confirmed_order,
   update_URLSlip,
+  getSellerCheckOrder,
+};
+
+const getName = async (ID, role, key) => {
+  const [FullName] = await promiseCustomer.execute(
+    "SELECT Firstname,Lastname FROM " + role + "_account WHERE " + key + "=?",
+    [ID]
+  );
+  let fullName = FullName[0].Firstname + " " + FullName[0].Lastname;
+  return fullName;
 };
 
 const checkErrorAddCart = async (req, res, params) => {
@@ -412,8 +664,12 @@ const checkErrorAddCart = async (req, res, params) => {
 
 const checkAddOrder = async (req, res, params) => {
   let errInOrder = "";
+  let orderResult = {
+    flag: true,
+    OID: "",
+  };
   for (const [key, value] of Object.entries(params)) {
-    if (value == "" || value == null) {
+    if ((value == "" || value == null )&& (key != "relatedID")) {
       errInOrder += key;
     }
   }
@@ -422,38 +678,50 @@ const checkAddOrder = async (req, res, params) => {
       status: "403MP",
       message: "Missing or Invalid Parameter : " + errInOrder,
     });
-    return false;
+    orderResult.flag = false;
+    return orderResult;
   } else {
-    await promiseOrder.execute(
-      "INSERT INTO order_c (OrderDate,Payment,Money,Status,CID) VALUES (?,?,?,?,?)",
+    const [result] = await promiseOrder.execute(
+      "INSERT INTO order_c (OrderDate,Payment,Money,Status,CID,ShippingCost,relateID) VALUES (?,?,?,?,?,?,?)",
       [
         params.OrderDate,
         params.Payment,
         params.Money,
         params.Status,
         params.customerID,
+        params.ShippingCost,
+        params.relatedID,
       ]
     );
+    orderResult.OID = result.insertId;
+
+    console.log(result);
   }
-  return true;
+  return orderResult;
 };
 
 const checkAddTransaction = async (req, res, lotteryList) => {
-  let errList = []
-  for(const element of lotteryList){
-    if(element.Number == "" || element.Lot == "" || element.Draw == "" || element.DrawDate == ""|| element.SID == ""||element.OID == ""){
+  let errList = [];
+  for (const element of lotteryList) {
+    if (
+      element.Number == "" ||
+      element.Lot == "" ||
+      element.Draw == "" ||
+      element.DrawDate == "" ||
+      element.SID == "" ||
+      element.OID == ""
+    ) {
       errList.push(element);
     }
   }
-  if(errList.length > 0){
+  if (errList.length > 0) {
     res.json({
       status: "403MP",
-      message: "Missing or Invalid Parameter" ,
-      errorList: errList
+      message: "Missing or Invalid Parameter",
+      errorList: errList,
     });
     return false;
-  }
-  else{
+  } else {
     for (const element of lotteryList) {
       await promiseOrder.execute(
         "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID) VALUES (?,?,?,?,?,?)",
@@ -469,7 +737,7 @@ const checkAddTransaction = async (req, res, lotteryList) => {
     }
     return true;
   }
-}
+};
 
 const getStorename = async (SID) => {
   const [storename] = await promiseCustomer.execute(
