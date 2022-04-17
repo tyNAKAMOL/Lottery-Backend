@@ -9,8 +9,9 @@ function Login() {
     Username: username,
     Password: password,
   };
+  let token="sdjkhfslhdfkjsldhf"
   function LoginSubmit() {
-    fetch("http://localhost:3333/login", {
+    fetch("http://localhost:3333/login"+token, {
       method: "POST", // or 'PUT'
       headers: {
         "Content-Type": "application/json",
@@ -19,7 +20,7 @@ function Login() {
     })
       .then((response) => response.json())
       .then((data) => {
-        if (data.status === "ok") {
+        if (data.status === "200OK") {
           localStorage.setItem("token", data.token);
           window.location = "/home";
           console.log("Success:", data);

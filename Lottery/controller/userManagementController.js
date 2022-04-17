@@ -26,7 +26,7 @@ const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
     if (value == null || value == "") {
-      errMsg += key;
+      errMsg += key+" ";
     }
   }
   return errMsg;
@@ -95,7 +95,9 @@ const register = (req, res, next) => {
   try {
     let Msg = "";
     let roleUser = "";
+    console.log(req.body)
     for (const [key, value] of Object.entries(req.body)) {
+      console.log(value)
       if (key == "Address") {
         for (const [key, value] of Object.entries(req.body.Address)) {
           if (value == "") {
@@ -105,7 +107,9 @@ const register = (req, res, next) => {
       }
       if (key == "URLImage") {
         continue;
-      } else if (value == "") {
+      } else if(key == "wantToBeSeller" && value != null){
+        continue;
+      }else if (value == "") {
         Msg += key + " ";
       }
     }
@@ -291,7 +295,6 @@ const registerAdmin = (req, res) => {
               req.body.URLImage,
             ],
             function (error) {
-              console.log(error)
               res.json({
                 status: "200OK",
                 message: "Register admin Success!!",

@@ -35,7 +35,7 @@ const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
     if (value == null || value == "") {
-      errMsg += key+" ";
+      errMsg += key + " ";
     }
   }
   return errMsg;
@@ -140,7 +140,7 @@ const updateStatusSeller = async (req, res) => {
               Subject: "บัญชีของคุณได้รับการยืนยันตัวตน",
               Detail:
                 "ทางเราได้ทำการตรวจสอบการยืนยันตัวจนบัญชีของคุณ" +
-                (await getName(req.body.sellerID,"seller","SID")) +
+                (await getName(req.body.sellerID, "seller", "SID")) +
                 "เรียบร้อยแล้ว บัญชีของคุณได้รับการอนุมัติสามารถวางจำหน่ายสินค้าได้ ขอขอบคุณ",
               Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
               CID: "",
@@ -150,20 +150,19 @@ const updateStatusSeller = async (req, res) => {
             await addTransactionAdmin({
               Event:
                 "Approved SellerAccount [ " +
-                (await getName(req.body.sellerID,"seller","SID")) +
+                (await getName(req.body.sellerID, "seller", "SID")) +
                 " sellerID : " +
                 req.body.sellerID +
                 "]",
               actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
               AID: adminID[0].AID,
             });
-          
           } else {
             await sendInbox({
               Subject: "บัญชีของคุณไม่ได้รับการยืนยันตัวตน",
               Detail:
                 "ทางเราได้ทำการตรวจสอบการยืนยันตัวจนบัญชีของคุณ" +
-                (await getName(req.body.sellerID,"seller","SID")) +
+                (await getName(req.body.sellerID, "seller", "SID")) +
                 "เรียบร้อยแล้ว ไม่สามารถอนุมัติให้ใช้งานได้เนื่องจากรูปถ่ายของคุณมีความไม่ชัดเจน/ไม่ถูกต้อง/ไม่สามารถระบุตัวตนได้ กรุณาส่งรูปถ่ายยืนยันตัวตนอีกครั้ง หากมีข้อสงสัยติดต่อที่ admin ขอขอบคุณ",
               Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
               CID: "",
@@ -173,10 +172,11 @@ const updateStatusSeller = async (req, res) => {
             await addTransactionAdmin({
               Event:
                 "Reject SellerAccount [ " +
-                (await getName(req.body.sellerID,"seller","SID")) +
+                (await getName(req.body.sellerID, "seller", "SID")) +
                 " sellerID : " +
                 req.body.sellerID +
-                "]" + " Because Image cannot Identity.",
+                "]" +
+                " Because Image cannot Identity.",
               actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
               AID: adminID[0].AID,
             });
@@ -225,8 +225,9 @@ const getOrderPayment = async (req, res) => {
           for (let i = 0; i < result.length; i++) {
             order.push({
               orderID: result[i].OID,
+              relateID: result[i].relateID,
               customerID: result[i].CID,
-              FullName: await getName(result[i].CID,"customer","CID"),
+              FullName: await getName(result[i].CID, "customer", "CID"),
               URLSlip: result[i].URLSlip,
               Money: result[i].Money,
             });
@@ -234,7 +235,7 @@ const getOrderPayment = async (req, res) => {
           res.json({
             status: "200OK",
             message: "get orderPayment success!!",
-            orderPayment : order,
+            orderPayment: order,
           });
         }
       } else {
@@ -255,11 +256,11 @@ const getOrderPayment = async (req, res) => {
 const updateOrderPayment = async (req, res) => {
   try {
     let validateData = {
-      token : req.body.token,
-      approve : req.body.approve, 
-      money : req.body.money, 
-      orderID : req.body.orderID,
-      customerID : req.body.customerID,
+      token: req.body.token,
+      approve: req.body.approve,
+      money: req.body.money,
+      orderID: req.body.orderID,
+      customerID: req.body.customerID,
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
@@ -277,55 +278,73 @@ const updateOrderPayment = async (req, res) => {
       );
       if (adminID != undefined) {
         if (role == "admin") {
+          const [orderID] = await promiseOrder.execute(
+            "SELECT OID FROM order_c WHERE OID=? or relateID=?",
+            [req.body.orderID, req.body.orderID]
+          );
           if (req.body.approve == "Yes") {
             await promiseOrder.execute(
-              "UPDATE order_c SET Status=? WHERE OID=? and CID=? and Status='Audit Payment' ",
-              ["Seller Check Order", req.body.orderID,req.body.customerID]
+              "UPDATE order_c SET Status=? WHERE (OID=? or relateID=?) and CID=? and Status='Audit Payment' ",
+              [
+                "Seller Check Order",
+                req.body.orderID,
+                req.body.orderID,
+                req.body.customerID,
+              ]
             );
-            const [sellerID] = await promiseOrder.execute(
-              "SELECT DISTINCT SID FROM transaction WHERE OID=?",[req.body.orderID]
-            )
-            for(let i = 0; i < sellerID.length ;i++){
-              await sendInbox({
-                Subject: "ตรวจสอบรายการคำสั่งซื้อที่ " + req.body.orderID ,
-                Detail: "กรุณาตรวจสอบคำสั่งซื้อที่ " + req.body.orderID + " ที่หน้าตรวจสอบคำสั่งซื้อ และกดปุ่มยืนยันเพื่อทำการยืนยันคำสั่งซื้อ หรือกดปุ่มยกเลิกเพิ้อทำการยกเลิกคำสั่งซื้อ ขอขอบคุณ",
-                Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-                CID: "",
-                SID: sellerID[i].SID,
+            for (let i = 0; i < orderID.length; i++) {
+              const [sellerID] = await promiseOrder.execute(
+                "SELECT DISTINCT SID FROM transaction WHERE OID=?",
+                [orderID[i].OID]
+              );
+              for (let i = 0; i < sellerID.length; i++) {
+                await sendInbox({
+                  Subject: "ตรวจสอบรายการคำสั่งซื้อที่ " + orderID[i].OID,
+                  Detail:
+                    "กรุณาตรวจสอบคำสั่งซื้อที่ " +
+                    orderID[i].OID +
+                    " ที่หน้าตรวจสอบคำสั่งซื้อ และกดปุ่มยืนยันเพื่อทำการยืนยันคำสั่งซื้อ หรือกดปุ่มยกเลิกเพิ้อทำการยกเลิกคำสั่งซื้อ ขอขอบคุณ",
+                  Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+                  CID: "",
+                  SID: sellerID[i].SID,
+                  AID: adminID[0].AID,
+                });
+              }
+              await addTransactionAdmin({
+                Event: "Approved Payment Order: [ " + orderID[i].OID + " ]",
+                actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
                 AID: adminID[0].AID,
               });
             }
-            await addTransactionAdmin({
-              Event:
-                "Approved Payment Order: [ " + req.body.orderID + " ]",
-              actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-              AID: adminID[0].AID,
-            });
-          
           } else {
+            console.log("No")
             await promiseOrder.execute(
-              "UPDATE order_c SET URLSlip='', Status='Pending Payment' WHERE Status='Audit Payment' and OID=?",
-              [req.body.OrderID]
+              "UPDATE order_c SET URLSlip='', Status='Pending Payment' WHERE Status='Audit Payment' and OID=? or relateID=?",
+              [req.body.orderID, req.body.orderID]
             );
-            await sendInbox({
-              Subject: "คำสั่งซื้อที่ "+ req.body.orderID + "ชำระเงินไม่สำเร็จ",
-              Detail:
-                "ทางเราได้ทำการตรวจสอบหลักฐานการชำระเงินของคุณ " +
-                (await getName(req.body.customerID,"customer","CID")) +
-                " ทางเราไม่สามารถอนุมัติหลักฐานการชำระเงินได้เนื่องจากหลักฐานการชำระเงินรูปภาพไม่ชัดเจนหรือชำระเงินไม่ถูกต้อง กรุณาชำระเงินให้ครบจำนวนเงิน/ส่งหลักฐานการชำระเงินใหม่ หากมีข้อสงสัยติดต่อที่ Admin ขอขอบคุณ",
-              Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-              CID: req.body.customerID,
-              SID: "",
-              AID: adminID[0].AID,
-            });
-            await addTransactionAdmin({
-              Event:
-                "Reject Payment Order [ " +
-                req.body.orderID +
-                "]" + " Because customer payment incompleted.",
-              actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
-              AID: adminID[0].AID,
-            });
+              for (let i = 0; i < orderID.length; i++) {
+              await sendInbox({
+                Subject:
+                  "คำสั่งซื้อที่ " + orderID[i].OID + "ชำระเงินไม่สำเร็จ",
+                Detail:
+                  "ทางเราได้ทำการตรวจสอบหลักฐานการชำระเงินของคุณ " +
+                  (await getName(req.body.customerID, "customer", "CID")) +
+                  " ทางเราไม่สามารถอนุมัติหลักฐานการชำระเงินได้เนื่องจากหลักฐานการชำระเงินรูปภาพไม่ชัดเจนหรือชำระเงินไม่ถูกต้อง กรุณาชำระเงินให้ครบจำนวนเงิน/ส่งหลักฐานการชำระเงินใหม่ หากมีข้อสงสัยติดต่อที่ Admin ขอขอบคุณ",
+                Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+                CID: req.body.customerID,
+                SID: "",
+                AID: adminID[0].AID,
+              });
+              await addTransactionAdmin({
+                Event:
+                  "Reject Payment Order [ " +
+                  orderID[i].OID +
+                  "]" +
+                  " Because customer payment incompleted.",
+                actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
+                AID: adminID[0].AID,
+              });
+            }
           }
           res.json({
             status: "200OK",
@@ -363,9 +382,9 @@ const addTransactionAdmin = async (params) => {
   );
 };
 
-const getName = async (ID,role,key) => {
+const getName = async (ID, role, key) => {
   const [FullName] = await promiseCustomer.execute(
-    "SELECT Firstname,Lastname FROM "+ role +"_account WHERE "+ key +"=?",
+    "SELECT Firstname,Lastname FROM " + role + "_account WHERE " + key + "=?",
     [ID]
   );
   let fullName = FullName[0].Firstname + " " + FullName[0].Lastname;
@@ -376,5 +395,5 @@ module.exports = {
   getSellerIdentity,
   updateStatusSeller,
   getOrderPayment,
-  updateOrderPayment
+  updateOrderPayment,
 };
