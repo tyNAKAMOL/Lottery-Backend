@@ -319,7 +319,7 @@ const updateOrderPayment = async (req, res) => {
           } else {
             console.log("No")
             await promiseOrder.execute(
-              "UPDATE order_c SET URLSlip='', Status='Pending Payment' WHERE Status='Audit Payment' and OID=? or relateID=?",
+              "UPDATE order_c SET URLSlip='', Status='RePending Payment' WHERE Status='Audit Payment' and OID=? or relateID=?",
               [req.body.orderID, req.body.orderID]
             );
               for (let i = 0; i < orderID.length; i++) {
