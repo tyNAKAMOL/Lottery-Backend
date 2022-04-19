@@ -278,4 +278,25 @@ String errMsg
 Response 
 code:403
 devMsg: Missing or invalid Parameter: [errMsg]
-  
+
+
+Table
+OrderId Name  Address  Tracking No. Status Remark 
+  1           See more
+
+
+Response
+{
+  "status":"200",
+  "Message":"Success",
+  infoList:[{
+    "OID":"",
+  "trackingNo":""
+  "firstName":"",
+  "lastName":"",
+  "Address":{
+    ...
+  },
+  "Lottery":[{...}]
+  }]
+}
