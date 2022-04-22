@@ -548,7 +548,6 @@ const updateSellerCheckOrder = async (req, res) => {
       const { username, role } = decoded;
       let countApprove = 0;
       if (role == "seller") {
-        
         for (const element of req.body.lotteryList) {
           if (element.approve == "Yes") {
             countApprove = countApprove + 1;
@@ -572,12 +571,16 @@ const updateSellerCheckOrder = async (req, res) => {
           }
         }
         let Refund = (req.body.lotteryList.length - countApprove) * 80;
-        const [delivery] = await promiseOrder.execute("SELECT ShippingFlag FROM order_c WHERE OID=?",[req.body.orderID]);
+        const [delivery] = await promiseOrder.execute(
+          "SELECT ShippingFlag FROM order_c WHERE OID=?",
+          [req.body.orderID]
+        );
         if (countApprove > 0) {
-          let status = delivery[0].ShippingFlag=="Yes" ? "Order Packing" : "Completed"
+          let status =
+            delivery[0].ShippingFlag == "Yes" ? "Order Packing" : "Completed";
           await promiseOrder.execute(
             "UPDATE order_c SET Status = ?, Refund=? WHERE Status='Seller Check Order' and OID = ?",
-            [status,Refund, req.body.orderID]
+            [status, Refund, req.body.orderID]
           );
         } else {
           await promiseOrder.execute(
@@ -600,6 +603,75 @@ const updateSellerCheckOrder = async (req, res) => {
   }
 };
 
+const randomLottery = async (req, res) => {
+  try {
+    let validateData = {
+      token: req.body.token,
+      Amount: req.body.Amount,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      if (role == "customer") {
+        const [results] = await promiseLottery.execute(
+          "SELECT * FROM singlelottery where Status='Available' "
+        );
+        if (results.length >= req.body.Amount) {
+          const [lottery] = await promiseLottery.execute(
+            "SELECT * FROM singlelottery where Status='Available' ORDER BY RAND() LIMIT " +
+              req.body.Amount
+          );
+          let lotteryMap = new Map();
+          for (const element of lottery) {
+            //xxxxxx|yyy
+            if (!lotteryMap.has(element.Number + "|" + element.SID)) {
+              lotteryMap.set(element.Number + "|" + element.SID, "1");
+            } else {
+              let num =
+                parseInt(lotteryMap.get(element.Number + "|" + element.SID)) +
+                1;
+              lotteryMap.set(element.Number + "|" + element.SID, String(num));
+            }
+          }
+          for (const [key, value] of lotteryMap.entries()) {
+            let temp = key.split("|");
+            checkErrorAddCart(req, res, {
+              Number: temp[0],
+              Amount: value, //
+              sellerID: temp[1],
+              customerID: await getID(username, "customer", "Username"),
+              lotteryPack: "N",
+            });
+          }
+          console.log(lotteryMap);
+          res.json({
+            status: "200OK",
+            message: "Success",
+          });
+        } else {
+          res.json({
+            status: "200CR",
+            message: "Cannot Random because lottery is not enough.",
+          });
+        }
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
 module.exports = {
   add_cart,
   get_cart,
@@ -609,6 +681,7 @@ module.exports = {
   update_URLSlip,
   getSellerCheckOrder,
   updateSellerCheckOrder,
+  randomLottery,
 };
 
 const getName = async (ID, role, key) => {
@@ -618,6 +691,14 @@ const getName = async (ID, role, key) => {
   );
   let fullName = FullName[0].Firstname + " " + FullName[0].Lastname;
   return fullName;
+};
+const getID = async (username, role, key) => {
+  const [ID] = await promiseCustomer.execute(
+    "SELECT CID FROM " + role + "_account WHERE " + key + "=?",
+    [username]
+  );
+  console.log(ID)
+  return ID[0].CID;
 };
 
 const checkErrorAddCart = async (req, res, params) => {

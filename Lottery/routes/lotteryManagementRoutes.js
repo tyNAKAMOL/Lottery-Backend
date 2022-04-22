@@ -5,7 +5,7 @@ const {
   get_singleLottery,
   get_packLottery,
   get_lottery,
-  search_Lottery
+  search_Lottery,
 } = require("../controller/lotteryManagementController");
 
 const router = express.Router();

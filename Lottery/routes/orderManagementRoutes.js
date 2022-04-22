@@ -7,7 +7,8 @@ const {
     confirmed_order,
     update_URLSlip,
     getSellerCheckOrder,
-    updateSellerCheckOrder
+    updateSellerCheckOrder,
+    randomLottery
 } = require("../controller/orderManagementController");
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get("/getCart/:token", get_cart);
 router.get("/getSellerCheckOrder/:token", getSellerCheckOrder);
 router.put("/updateOrderSlip/", update_URLSlip);
 // router.put("/updateCart/", update_cart);
+router.post("/randomLottery", randomLottery);
 router.delete("/removeLottery/", delete_cart);
 router.put("/updateSellerCheckOrder", updateSellerCheckOrder);
 

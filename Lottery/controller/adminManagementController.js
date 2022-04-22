@@ -367,6 +367,7 @@ const updateTracking = async (req, res) => {
       token: req.body.token,
       orderID: req.body.orderID,
       customerID: req.body.customerID,
+
       tracking: req.body.tracking,
     };
     const errMsg = validateMethod(validateData);
@@ -377,6 +378,8 @@ const updateTracking = async (req, res) => {
       });
       return;
     } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
       const [adminID] = await promiseAdmin.execute(
         "SELECT AID FROM account WHERE Username=?",
         [username]
@@ -384,8 +387,8 @@ const updateTracking = async (req, res) => {
       if (adminID != undefined) {
         if (role == "admin") {
           await promiseOrder.execute(
-            "UPDATE order_c SET Tracking_Number=? WHERE Status='Order Packing' and OID=?",
-            [req.body.tracking, Number(req.body.orderID)]
+            "UPDATE order_c SET Status='Completed', Tracking_Number=? WHERE Status='Order Packing' and OID=?",
+            [req.body.tracking, parseInt(req.body.orderID)]
           );
           await sendInbox({
             Subject: "แจ้งเลขพัสดุของคำสั่งซื้อที่ " + req.body.orderID,
@@ -393,7 +396,7 @@ const updateTracking = async (req, res) => {
               "แจ้งหมายเลขพัสดุ " +
               req.body.tracking +
               " คำสั่งซื้อที่ " +
-              orderID[i].OID +
+              req.body.orderID +
               " โปรดตรวจสอบหมายเลขพัสดุของคุณที่หน้าประวัติการสั่งซื้อ ขอขอบคุณ",
             Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
             CID: req.body.customerID,
@@ -410,6 +413,10 @@ const updateTracking = async (req, res) => {
             actionDate: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
             AID: adminID[0].AID,
           });
+          res.json({
+            status: "200OK",
+            message: "Update Tracking Success!!",
+          });
         }
       }
     }
@@ -420,55 +427,9 @@ const updateTracking = async (req, res) => {
     });
   }
 };
+
 const getCommon = async (req, res) => {
   try {
-    const [result] = await promiseOrder.execute(
-      "SELECT x.OID,x.Money,x.Tracking_Number,y.CID,y.HomeNo,y.Soi,y.Road,y.Subdistrict,y.District,y.Province,y.ZipCode,z.Number_lottery, z.Lot, z.Draw ,z.DrawDate FROM order.order_c x JOIN customer.customer_account y JOIN order.transaction z on x.CID = y.CID and x.OID=z.OID WHERE x.Status='Order Packing'"
-
-      // "SELECT x.OID y.HomeNo y.Soi y.Road y.Subdistrict y.District y.Province y.ZipCode FROM order.order_c x JOIN customer.customer_account y JOIN order.transaction z on x.CID = y.CID and x.OID=z.OID WHERE x.Status='Order Packing'"
-    );
-    let resultMap = new Map();
-    for (const element of result) {
-      let Address = {
-        HomeNo: element.HomeNo,
-        Soi: element.Soi,
-        Road: element.Road,
-        Subdistrict: element.Subdistrict,
-        District: element.District,
-        Province: element.Province,
-        ZipCode: element.ZipCode,
-      };
-
-      // let resultList = [{Address:{}},{}]
-      // let lotteryList = []
-      let lottery = {
-        Number_lottery : element.Number_lottery,
-        Lot : element.Lot,
-        Draw : element.Draw,
-        DrawDate : element.DrawDate
-      }
-
-      // if(maplist.has(element.OID)){
-      //   resultList = resultMap.get(element.OID);
-      //   lotteryList.push(lottery);
-
-      // }
-    }
-    res.json({
-      status: "200OK",
-      message: "Success",
-      data: result,
-    });
-  } catch (error) {
-    res.json({
-      status: "500IS",
-      message: "Internal Server : " + error,
-    });
-  }
-};
-const getCommonTrack = async (req, res) => {
-  try {
-    let order = [];
     let validateData = {
       token: req.params.token,
     };
@@ -484,40 +445,57 @@ const getCommonTrack = async (req, res) => {
       const { username, role } = decoded;
       if (role == "admin") {
         const [result] = await promiseOrder.execute(
-          "SELECT x.OID y.HomeNo y.Soi y.Road y.Subdistrict y.District y.Province y.ZipCode FROM order.order_c x JOIN customer.customer_account y on x.CID = y.CID WHERE x.Status='Order Packing'"
+          "SELECT x.OID,x.Money,x.Tracking_Number,y.CID,y.HomeNo,y.Soi,y.Road,y.Subdistrict,y.District,y.Province,y.ZipCode,z.Number_lottery, z.Lot, z.Draw ,z.DrawDate FROM order.order_c x JOIN customer.customer_account y JOIN order.transaction z on x.CID = y.CID and x.OID=z.OID WHERE x.Status='Order Packing'"
         );
-        if (result.length == 0) {
-          res.json({
-            status: "200NF",
-            message: "not found in order status Order Packing",
-          });
-        } else {
-          let i = 0;
-          while (i < result.length) {
-            const [lottery] = await promiseLottery.execute(
-              "SELECT x.OID y.HomeNo y.Soi y.Road y.Subdistrict y.District y.Province y.ZipCode FROM order.order_c x JOIN customer.customer_account y on x.CID = y.CID WHERE x.Status='Order Packing'"
-            );
-            order[i] = {
-              orderID: result[i].OID,
-              FullName: await getName(result[i].CID, "customer", "CID"),
-              Address: {
-                HomeNo: result[i].HomeNo,
-                Soi: result[i].Soi,
-                Road: result[i].Road,
-                Subdistrict: result[i].Subdistrict,
-                District: result[i].District,
-                Province: result[i].Province,
-                ZipCode: result[i].ZipCode,
-              },
-              lotteryList: {},
+        let resultMap = new Map();
+        let lotteryList = [];
+        let infoList = [];
+        for (const element of result) {
+          let Address = {
+            HomeNo: element.HomeNo,
+            Soi: element.Soi,
+            Road: element.Road,
+            Subdistrict: element.Subdistrict,
+            District: element.District,
+            Province: element.Province,
+            ZipCode: element.ZipCode,
+          };
+          if (!resultMap.has(element.OID)) {
+            lotteryList[0] = {
+              Number_lottery: element.Number_lottery,
+              Lot: element.Lot,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
             };
+            let orderInfo = {
+              OID: result[0].OID,
+              Tracking_Number: result[0].Tracking_Number,
+              FullName: await getName(result[0].CID, "customer", "CID"),
+              Address: Address,
+              lotteryList: lotteryList,
+            };
+            resultMap.set(element.OID, orderInfo);
+          } else {
+            let orderInfoById = resultMap.get(element.OID);
+            let orderList = orderInfoById.lotteryList;
+            orderList.push({
+              Number_lottery: element.Number_lottery,
+              Lot: element.Lot,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
+            });
+            resultMap.set(element.OID, orderInfoById);
           }
-          res.json({
-            status: "200OK",
-            message: "get orderPayment success!!",
-            orderPayment: order,
-          });
         }
+        console.log(resultMap.size);
+        for (const [key, value] of resultMap.entries()) {
+          infoList.push(value);
+        }
+        res.json({
+          status: "200OK",
+          message: "Success",
+          data: infoList,
+        });
       } else {
         res.json({
           status: "401UR",
@@ -569,4 +547,5 @@ module.exports = {
   getOrderPayment,
   updateOrderPayment,
   getCommon,
+  updateTracking,
 };
