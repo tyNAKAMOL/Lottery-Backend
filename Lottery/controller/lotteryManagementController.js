@@ -22,7 +22,35 @@ const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
     if (value == null || value == "" || value == []) {
-      errMsg += key;
+      errMsg += key+" ";
+    }
+  }
+  return errMsg;
+};
+const validateMethodLottery = (vd,Pack) => {
+  let errMsg = "";
+  for (const [key, value] of Object.entries(vd)) {
+    if (value == null || value == "" || value == []) {
+      errMsg += key+" ";
+    }
+    if(key=="lotteryList"){
+      for(const vdLottery of vd.lotteryList){
+        let params = {
+          Number: vdLottery.Number,
+          Lot: vdLottery.Lot,
+          Draw: vdLottery.Draw,
+          DrawDate: vdLottery.DrawDate
+        }
+        if(Pack == "Y"){
+          params["Amount"] = vdLottery.Amount
+        }
+        for(const [key,value] of Object.entries(params)){
+          if (value == null || value == "" ){
+            errMsg += key+" ";
+          }
+        }
+      }
+      
     }
   }
   return errMsg;
@@ -34,11 +62,11 @@ const add_singleLottery = async (req, res) => {
       token: req.body.token,
       lotteryList: req.body.lotteryList,
     };
-    const errMsg = validateMethod(validateData);
+    const errMsg = validateMethodLottery(validateData,"N");
     if (errMsg.length > 0) {
       res.json({
         status: "403MP",
-        message: "Missing or Invalid Parameter : " + Msg,
+        message: "Missing or Invalid Parameter : " + errMsg,
       });
       return;
     } else {
@@ -72,8 +100,9 @@ const add_packLottery = async (req, res) => {
   try {
     let validateData = {
       token: req.body.token,
+      lotteryList: req.body.lotteryList,
     };
-    const errMsg = validateMethod(validateData);
+    const errMsg = validateMethodLottery(validateData,"Y");
     if (errMsg.length > 0) {
       res.json({
         status: "403MP",
@@ -280,7 +309,7 @@ const countAddSingleLottery = async (req, res, results) => {
   let validateData = {
     lotteryList: req.body.lotteryList,
   };
-  const errMsg = validateMethod(validateData);
+  const errMsg = validateMethodLottery(validateData,"N");
   if (errMsg.length > 0) {
     res.json({
       status: "403MP",
@@ -335,7 +364,7 @@ const countAddPackLottery = async (req, res, results) => {
   let validateData = {
     lotteryList: req.body.lotteryList,
   };
-  const errMsg = validateMethod(validateData);
+  const errMsg = validateMethodLottery(validateData,"Y");
   if (errMsg.length > 0) {
     res.json({
       status: "403MP",
