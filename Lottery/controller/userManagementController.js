@@ -26,7 +26,7 @@ const validateMethod = (vd) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
     if (value == null || value == "") {
-      errMsg += key+" ";
+      errMsg += key + " ";
     }
   }
   return errMsg;
@@ -95,25 +95,47 @@ const register = (req, res, next) => {
   try {
     let Msg = "";
     let roleUser = "";
-    console.log(req.body)
-    for (const [key, value] of Object.entries(req.body)) {
+    console.log(req.body);
+    let validateData = {
+      Title:req.body.Title,
+      Firstname: req.body.Firstname,
+      Lastname: req.body.Lastname,
+      Username:req.body.Username,
+      Password:req.body.Password,
+      Tel: req.body.Tel,
+      Birthday: req.body.Birthday,
+      Email: req.body.Email,
+      Address: {
+        HomeNo: req.body.Address.HomeNo,
+        Soi: req.body.Address.Soi,
+        Road: req.body.Address.Road,
+        Subdistrict: req.body.Address.Subdistrict,
+        District: req.body.Address.District,
+        Province: req.body.Address.Province,
+        ZipCode: req.body.Address.ZipCode,
+      },
+      IDCard: req.body.IDCard,
+      wantToBeSeller:req.body.wantToBeSeller,
+      URLImage:req.body.URLImage,
+    };
+    for (const [key, value] of Object.entries(validateData)) {
       console.log(value)
       if (key == "Address") {
-        for (const [key, value] of Object.entries(req.body.Address)) {
-          if (value == "") {
+        for (const [key, value] of Object.entries(validateData.Address)) {
+          if (value == null || value == "" || value == []) {
             Msg += key + " ";
           }
         }
       }
-      if (key == "URLImage") {
+      console.log(validateData.wantToBeSeller=="No")
+      if (key == "URLImage" && validateData.wantToBeSeller=="No") {
         continue;
       } else if(key == "wantToBeSeller" && value != null){
         continue;
-      }else if (value == "") {
+      }else  if (value == null || value == "" || value == []) {
         Msg += key + " ";
       }
     }
-    // //let a = await validate();
     if (Msg.length > 0) {
       res.json({
         status: "403MP",
@@ -214,7 +236,7 @@ const register = (req, res, next) => {
                                     }
                                     if (
                                       req.body.wantToBeSeller != null &&
-                                      req.body.wantToBeSeller == true
+                                      req.body.wantToBeSeller == "Yes"
                                     ) {
                                       connectionCustomer.execute(
                                         "UPDATE seller_account SET URLImage=? , Storename=?,Status='sellerIdentity' WHERE Username=?",
