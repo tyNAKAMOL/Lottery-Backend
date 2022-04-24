@@ -44,6 +44,10 @@ const add_cart = async (req, res) => {
   try {
     let validateData = {
       token: req.body.token,
+      Number: req.body.Number_lottery,
+      Amount: req.body.Amount,
+      lotteryPack: req.body.Pack_Flag,
+      StoreName:req.body.Storename
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
@@ -61,25 +65,41 @@ const add_cart = async (req, res) => {
           "SELECT CID FROM customer_account WHERE Username=? ",
           [username]
         );
-        const [sellerID] = await promiseCustomer.execute(
-          "SELECT SID FROM seller_account WHERE Storename=? ",
-          [req.body.Storename]
-        );
-        let params = {
-          Number: req.body.Number_lottery,
-          Amount: req.body.Amount,
-          sellerID: sellerID[0].SID,
-          customerID: customerID[0].CID,
-          lotteryPack: req.body.Pack_Flag,
-        };
-        console.log(params);
-        let addCartSuccess = await checkErrorAddCart(req, res, params);
-        if (addCartSuccess) {
-          res.json({
-            status: "200OK",
-            message: "Add lottery to cart success!!",
-          });
-        }
+          const [sellerID] = await promiseCustomer.execute(
+            "SELECT SID FROM seller_account WHERE Storename=? ",
+            [req.body.Storename]
+          );
+          if (sellerID != null && sellerID.length > 0) {
+            let params = {
+              Number: req.body.Number_lottery,
+              Amount: req.body.Amount,
+              sellerID: sellerID[0].SID,
+              customerID: customerID[0].CID,
+              lotteryPack: req.body.Pack_Flag,
+            };
+            const [DupLottery] = await promiseOrder.execute(
+              "SELECT * FROM cart WHERE Number_lottery=?  and SID=? and CID=? and Pack_Flag=?",[req.body.Number_lottery,sellerID[0].SID,customerID[0].CID,req.body.Pack_Flag,]            )
+            console.log(DupLottery)
+            if(DupLottery.length > 0){
+              await promiseOrder.execute(
+                "UPDATE cart SET Amount=? WHERE CID = ? and Number_lottery = ? and SID=?",[String(parseInt(DupLottery[0].Amount)+parseInt(req.body.Amount)),customerID[0].CID,req.body.Number_lottery,sellerID[0].SID]
+              )
+              res.json({
+                status: "200OK",
+                message: "Add lottery to cart success!!",
+              });
+              return;
+            }else{
+             // console.log(params);
+              let addCartSuccess = await checkErrorAddCart(req, res, params);
+              if (addCartSuccess) {
+                res.json({
+                  status: "200OK",
+                  message: "Add lottery to cart success!!",
+                });
+              }
+            }
+          }
       } else {
         res.json({
           status: "401UR",
@@ -206,6 +226,8 @@ const delete_cart = async (req, res) => {
   try {
     let validateData = {
       token: req.body.token,
+      StoreName:req.body.Storename,
+      lottery:req.body.Number_lottery
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
@@ -226,7 +248,7 @@ const delete_cart = async (req, res) => {
           "SELECT * FROM seller_account WHERE Storename=? ",
           [req.body.Storename]
         );
-        if (customerID != undefined && sellerID != undefined) {
+        if (customerID != undefined && customerID.length > 0 && sellerID != undefined && sellerID.length > 0) {
           await promiseOrder.execute(
             "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=?",
             [req.body.Number_lottery, sellerID[0].SID, customerID[0].CID]
@@ -234,6 +256,11 @@ const delete_cart = async (req, res) => {
           res.json({
             status: "200OK",
             message: "customer remove lottery from cart success!!",
+          });
+        }else{
+          res.json({
+            status: "403MP",
+            message: "Missing or Invalid Parameter : customerID or sellerID is null.",
           });
         }
       }
@@ -252,21 +279,11 @@ const confirmed_order = async (req, res) => {
     let validateDataInCart = [];
     //  console.log(req.body.lotteryList);
     for (const element of req.body.lotteryList) {
-      // validateDataInCart.push({
-      //   storeName : element.storeName,
-      //   Number : element.Number_lottery,
-      //   Draw : element.Draw,
-      //   DrawDate : element.DrawDate,
-      //   Pack : element.Pack,
-      //   Amount : element.Amount,
-      //   Money : element.Money
-      // })
-
       let param = {
         storeName: element.Storename,
         Number: element.Number,
-        Draw: element.Draw,
-        DrawDate: element.DrawDate,
+        // Draw: element.Draw,
+        // DrawDate: element.DrawDate,
         Storename: element.Storename,
         Pack: element.pack,
         Amount: element.Amount,
@@ -298,8 +315,8 @@ const confirmed_order = async (req, res) => {
             sellerMapList = sellerMap.get(element.Storename);
             sellerMapList.push({
               Number: element.Number,
-              Draw: element.Draw,
-              DrawDate: element.DrawDate,
+              // Draw: element.Draw,
+              // DrawDate: element.DrawDate,
               Pack: element.pack,
               Storename: element.Storename,
               Amount: element.Amount,
@@ -309,8 +326,8 @@ const confirmed_order = async (req, res) => {
           } else {
             sellerMapList.push({
               Number: element.Number,
-              Draw: element.Draw,
-              DrawDate: element.DrawDate,
+              // Draw: element.Draw,
+              // DrawDate: element.DrawDate,
               Pack: element.pack,
               Storename: element.Storename,
               Amount: element.Amount,
@@ -576,15 +593,14 @@ const updateSellerCheckOrder = async (req, res) => {
           [req.body.orderID]
         );
         if (countApprove > 0) {
-          let status =
-            delivery[0].ShippingFlag == "Yes" ? "Order Packing" : "Completed";
+          let status = "Order Packing";
           await promiseOrder.execute(
             "UPDATE order_c SET Status = ?, Refund=? WHERE Status='Seller Check Order' and OID = ?",
             [status, Refund, req.body.orderID]
           );
         } else {
           await promiseOrder.execute(
-            "UPDATE order_c SET Status = 'Canceled', Refund=? WHERE Status='Seller Check Order' and OID = ?",
+            "UPDATE order_c SET Status = 'Cancelled', Refund=? WHERE Status='Seller Check Order' and OID = ?",
             [Refund, req.body.orderID]
           );
         }
@@ -697,12 +713,13 @@ const getID = async (username, role, key) => {
     "SELECT CID FROM " + role + "_account WHERE " + key + "=?",
     [username]
   );
-  console.log(ID)
+  console.log(ID);
   return ID[0].CID;
 };
 
 const checkErrorAddCart = async (req, res, params) => {
   let errInCart = "";
+  
   for (const [key, value] of Object.entries(params)) {
     if (value == "" || value == null) {
       errInCart += key;
@@ -830,13 +847,14 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
     if (orderList != null) {
       for (const element of orderList) {
         console.log("element", element);
-        if (element.pack != null && element.pack == "Y") {
+        if (element.Pack != null && element.Pack == "Y") {
           console.log("pack!");
           const [packLottery] = await promiseLottery.execute(
             "SELECT * FROM packlottery WHERE status='Available' and Number=?",
             [element.Number]
           );
-          const Storename = await getStorename(element.SID);
+          //const Storename = await getStorename(element.SID);
+          console.log("packlottery",packLottery)
           if (packLottery.length > 0) {
             let orderSize =
               packLottery.length >= element.Amount
@@ -855,6 +873,7 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
             for (let i = 0; i < orderSize; i++) {
               await promiseLottery.execute(
                 "UPDATE packlottery SET Status=? , OID=? WHERE Number=? and Lot=? and Draw=?",
+               
                 [
                   "reserved",
                   OID,
