@@ -163,7 +163,7 @@ const updateStatusSeller = async (req, res) => {
               Detail:
                 "ทางเราได้ทำการตรวจสอบการยืนยันตัวจนบัญชีของคุณ" +
                 (await getName(req.body.sellerID, "seller", "SID")) +
-                "เรียบร้อยแล้ว ไม่สามารถอนุมัติให้ใช้งานได้เนื่องจากรูปถ่ายของคุณมีความไม่ชัดเจน/ไม่ถูกต้อง/ไม่สามารถระบุตัวตนได้ กรุณาส่งรูปถ่ายยืนยันตัวตนอีกครั้ง หากมีข้อสงสัยติดต่อที่ admin ขอขอบคุณ",
+                "เรียบร้อยแล้ว ไม่สามารถอนุมัติให้ใช้งานได้เนื่องจากรูปถ่ายของคุณมีความไม่ชัดเจน/ไม่ถูกต้อง/ไม่สามารถระบุตัวตนได้ กรุณาส่งรูปถ่ายยืนยันตัวตนอีกครั้ง ขอขอบคุณ",
               Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
               CID: "",
               SID: req.body.sellerID,
@@ -325,11 +325,11 @@ const updateOrderPayment = async (req, res) => {
             for (let i = 0; i < orderID.length; i++) {
               await sendInbox({
                 Subject:
-                  "คำสั่งซื้อที่ " + orderID[i].OID + "ชำระเงินไม่สำเร็จ",
+                  "คำสั่งซื้อที่ " + orderID[i].OID + " ชำระเงินไม่สำเร็จ",
                 Detail:
                   "ทางเราได้ทำการตรวจสอบหลักฐานการชำระเงินของคุณ " +
                   (await getName(req.body.customerID, "customer", "CID")) +
-                  " ทางเราไม่สามารถอนุมัติหลักฐานการชำระเงินได้เนื่องจากหลักฐานการชำระเงินรูปภาพไม่ชัดเจนหรือชำระเงินไม่ถูกต้อง กรุณาชำระเงินให้ครบจำนวนเงิน/ส่งหลักฐานการชำระเงินใหม่ หากมีข้อสงสัยติดต่อที่ Admin ขอขอบคุณ",
+                  " ไม่สามารถอนุมัติหลักฐานการชำระเงินได้เนื่องจากหลักฐานการชำระเงินรูปภาพไม่ชัดเจนหรือชำระเงินไม่ถูกต้อง กรุณาชำระเงินและส่งหลักฐานการชำระเงินใหม่ ขอขอบคุณ",
                 Date: moment(new Date()).format("YYYYMMDDHHmmssZZ"),
                 CID: req.body.customerID,
                 SID: "",
@@ -367,7 +367,6 @@ const updateTracking = async (req, res) => {
       token: req.body.token,
       orderID: req.body.orderID,
       customerID: req.body.customerID,
-
       tracking: req.body.tracking,
     };
     const errMsg = validateMethod(validateData);
@@ -427,6 +426,42 @@ const updateTracking = async (req, res) => {
     });
   }
 };
+
+const getNotification = async(req,res)=>{
+  try { 
+    let validateData = {
+      token: req.params.token
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+      return;
+    } else {
+    const decoded = jwt.verify(req.params.token, secret);
+    const { username, role } = decoded;
+    console.log(role)
+    let key = role=="customer" ? "CID":"SID";
+    let ID = await getID(username,role,key)
+    console.log(key + " " + ID)
+    const [Notification] = await promiseAdmin.execute(
+      "SELECT * FROM inbox WHERE "+key+"="+ID
+    ) 
+    console.log(Notification);
+    res.json({
+      status: "200OK",
+      message: "get Notification Success!!",
+      NotificationList: Notification
+    });
+  }} catch (error) {
+    res.json({
+      status: "500IS",
+      message: "Internal Server : " + error,
+    });
+  }
+}
 
 const getCommon = async (req, res) => {
   try {
@@ -541,6 +576,16 @@ const getName = async (ID, role, key) => {
   return fullName;
 };
 
+const getID = async (username, role, key) => {
+  const [ID] = await promiseCustomer.execute(
+    "SELECT "+key+" FROM " + role + "_account WHERE Username=?",
+    [username]
+  );
+  console.log(ID);
+  let id_ = key=="SID"? ID[0].SID : ID[0].CID
+  return id_;
+};
+
 module.exports = {
   getSellerIdentity,
   updateStatusSeller,
@@ -548,4 +593,5 @@ module.exports = {
   updateOrderPayment,
   getCommon,
   updateTracking,
+  getNotification 
 };

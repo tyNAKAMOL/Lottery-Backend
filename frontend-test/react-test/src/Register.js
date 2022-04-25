@@ -8,33 +8,38 @@ function Register() {
   const [email, setEmail] = useState("");
   const [firstname, setFirstname] = useState("");
   const [lastname, setLastname] = useState("");
-  const jsonData = {
-    Username: username,
-    Email: email,
-    Password: password,
-    FirstName: firstname,
-    LastName: lastname,
+  const [draw, setDraw] = useState("0");
+  const onChange1 = (e) => {
+    setDraw(e.target.value + "|");
   };
-  function RSubmit() {
-    fetch("http://localhost:3333/register", {
-      method: "POST", // or 'PUT'
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(jsonData),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.status === "ok") {
-          //   localStorage.setItem("token", data.token);
-          window.location = "/login";
-          console.log("Success:", data);
-        }
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-      });
-  }
+
+  // const jsonData = {
+  //   Username: username,
+  //   Email: email,
+  //   Password: password,
+  //   FirstName: firstname,
+  //   LastName: lastname,
+  // };
+  // function RSubmit() {
+  //   fetch("http://localhost:3333/register", {
+  //     method: "POST", // or 'PUT'
+  //     headers: {
+  //       "Content-Type": "application/json",
+  //     },
+  //     body: JSON.stringify(jsonData),
+  //   })
+  //     .then((response) => response.json())
+  //     .then((data) => {
+  //       if (data.status === "ok") {
+  //         //   localStorage.setItem("token", data.token);
+  //         window.location = "/login";
+  //         console.log("Success:", data);
+  //       }
+  //     })
+  //     .catch((error) => {
+  //       console.error("Error:", error);
+  //     });
+  // }
 
   return (
     <div className="container">
@@ -49,14 +54,15 @@ function Register() {
           <form>
             <div className="password">
               <div className="input-group-prepend"></div>
+              <h1>{draw}</h1>
               <input
                 type="text"
                 style={{ fontSize: "20px" }}
                 className="form-control"
                 placeholder="Firstname"
-                onChange={(e) => {
-                  setFirstname(e.target.value);
-                }}
+                // onChange={(e) => {
+                //   onChange1(e.target.value);
+                // }}
               />
             </div>
             <div className="password">
@@ -66,9 +72,9 @@ function Register() {
                 style={{ fontSize: "20px" }}
                 className="form-control"
                 placeholder="Lastname"
-                onChange={(e) => {
-                  setLastname(e.target.value);
-                }}
+                // onChange={(e) => {
+                //   onChange1(e.target.value);
+                // }}
               />
             </div>
             <div className="user">
@@ -78,9 +84,9 @@ function Register() {
                 type="text"
                 className="form-control"
                 placeholder="Username"
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                }}
+                // onChange={(e) => {
+                //   onChange1(e.target.value);
+                // }}
               />
             </div>
             <div className="password">
@@ -94,9 +100,9 @@ function Register() {
                 style={{ fontSize: "20px" }}
                 className="form-control"
                 placeholder="Password"
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                }}
+                // onChange={(e) => {
+                //   onChange1(e.target.value);
+                // }}
               />
             </div>
 
@@ -107,14 +113,17 @@ function Register() {
                 style={{ fontSize: "20px" }}
                 className="form-control"
                 placeholder="Email"
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                }}
+                onChange={onChange1}
               />
             </div>
 
             <div className="bo">
-              <Button variant="contained" onClick={RSubmit}>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  console.log(draw);
+                }}
+              >
                 Register
               </Button>
             </div>
