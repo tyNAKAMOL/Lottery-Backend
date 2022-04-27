@@ -229,7 +229,7 @@ const getOrderPayment = async (req, res) => {
               customerID: result[i].CID,
               FullName: await getName(result[i].CID, "customer", "CID"),
               URLSlip: result[i].URLSlip,
-              Money: result[i].Money,
+              Money: String(parseInt(result[i].Money)+40),
             });
           }
           res.json({

@@ -47,7 +47,7 @@ const add_cart = async (req, res) => {
       Number: req.body.Number_lottery,
       Amount: req.body.Amount,
       lotteryPack: req.body.Pack_Flag,
-      StoreName:req.body.Storename
+      StoreName: req.body.Storename,
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
@@ -59,47 +59,67 @@ const add_cart = async (req, res) => {
     } else {
       const decoded = jwt.verify(req.body.token, secret);
       const { username, role } = decoded;
-      let lotteryPack = ""; // -> singleLottery send "N"
+      let Dup = false; // -> singleLottery send "N"
       if (role == "customer") {
         const [customerID] = await promiseCustomer.execute(
           "SELECT CID FROM customer_account WHERE Username=? ",
           [username]
         );
-          const [sellerID] = await promiseCustomer.execute(
-            "SELECT SID FROM seller_account WHERE Storename=? ",
-            [req.body.Storename]
+        const [sellerID] = await promiseCustomer.execute(
+          "SELECT SID FROM seller_account WHERE Storename=? ",
+          [req.body.Storename]
+        );
+        if (sellerID != null && sellerID.length > 0) {
+          let params = {
+            Number: req.body.Number_lottery,
+            Amount: req.body.Amount,
+            sellerID: sellerID[0].SID,
+            customerID: customerID[0].CID,
+            lotteryPack: req.body.Pack_Flag,
+            PackAmount: req.body.PackAmount,
+            DrawDate: req.body.DrawDate,
+          };
+          const [DupLottery] = await promiseOrder.execute(
+            "SELECT * FROM cart WHERE Number_lottery=? and SID=? and CID=? and Pack_Flag=? and PackAmount=? and DrawDate=?",
+            [
+              req.body.Number_lottery,
+              sellerID[0].SID,
+              customerID[0].CID,
+              req.body.Pack_Flag,
+              req.body.PackAmount,
+              req.body.DrawDate
+            ]
           );
-          if (sellerID != null && sellerID.length > 0) {
-            let params = {
-              Number: req.body.Number_lottery,
-              Amount: req.body.Amount,
-              sellerID: sellerID[0].SID,
-              customerID: customerID[0].CID,
-              lotteryPack: req.body.Pack_Flag,
-            };
-            const [DupLottery] = await promiseOrder.execute(
-              "SELECT * FROM cart WHERE Number_lottery=?  and SID=? and CID=? and Pack_Flag=?",[req.body.Number_lottery,sellerID[0].SID,customerID[0].CID,req.body.Pack_Flag,]            )
-            console.log(DupLottery)
-            if(DupLottery.length > 0){
-              await promiseOrder.execute(
-                "UPDATE cart SET Amount=? WHERE CID = ? and Number_lottery = ? and SID=?",[String(parseInt(DupLottery[0].Amount)+parseInt(req.body.Amount)),customerID[0].CID,req.body.Number_lottery,sellerID[0].SID]
-              )
+          console.log(DupLottery);
+          if (DupLottery.length > 0) {
+            await promiseOrder.execute(
+              "UPDATE cart SET Amount=? WHERE CID = ? and Number_lottery = ? and SID=? and PackAmount=? and DrawDate=?",
+              [
+                String(
+                  parseInt(DupLottery[0].Amount) + parseInt(req.body.Amount)
+                ),
+                customerID[0].CID,
+                req.body.Number_lottery,
+                sellerID[0].SID,
+                req.body.PackAmount,
+                req.body.DrawDate
+              ]
+            );
+            res.json({
+              status: "200OK",
+              message: "Add lottery to cart success!!",
+            });
+            return;
+          } else {
+            let addCartSuccess = await checkErrorAddCart(req, res, params);
+            if (addCartSuccess) {
               res.json({
                 status: "200OK",
                 message: "Add lottery to cart success!!",
               });
-              return;
-            }else{
-             // console.log(params);
-              let addCartSuccess = await checkErrorAddCart(req, res, params);
-              if (addCartSuccess) {
-                res.json({
-                  status: "200OK",
-                  message: "Add lottery to cart success!!",
-                });
-              }
             }
           }
+        }
       } else {
         res.json({
           status: "401UR",
@@ -134,7 +154,7 @@ const get_cart = async (req, res) => {
         );
         if (customerID[0].CID != undefined) {
           const [cart_] = await promiseCommon.execute(
-            " SELECT a.Number_lottery, a.Amount,a.Pack_Flag, b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
+            " SELECT a.Number_lottery , a.Amount,a.Pack_Flag,a.DrawDate, a.PackAmount , b.Storename FROM order.cart a JOIN customer.seller_account b on a.SID = b.SID where a.CID=?",
             [customerID[0].CID]
           );
           res.json({
@@ -226,9 +246,12 @@ const delete_cart = async (req, res) => {
   try {
     let validateData = {
       token: req.body.token,
-      StoreName:req.body.Storename,
-      lottery:req.body.Number_lottery
+      StoreName: req.body.Storename,
+      lottery: req.body.Number_lottery,
+      Pack: req.body.pack,
+      PackAmount: req.body.PackAmount,
     };
+    console.log("req", validateData);
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
       res.json({
@@ -248,19 +271,31 @@ const delete_cart = async (req, res) => {
           "SELECT * FROM seller_account WHERE Storename=? ",
           [req.body.Storename]
         );
-        if (customerID != undefined && customerID.length > 0 && sellerID != undefined && sellerID.length > 0) {
+        if (
+          customerID != undefined &&
+          customerID.length > 0 &&
+          sellerID != undefined &&
+          sellerID.length > 0
+        ) {
           await promiseOrder.execute(
-            "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=?",
-            [req.body.Number_lottery, sellerID[0].SID, customerID[0].CID]
+            "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=? and PackAmount=? and Pack_Flag=?",
+            [
+              req.body.Number_lottery,
+              sellerID[0].SID,
+              customerID[0].CID,
+              req.body.PackAmount,
+              req.body.pack,
+            ]
           );
           res.json({
             status: "200OK",
             message: "customer remove lottery from cart success!!",
           });
-        }else{
+        } else {
           res.json({
             status: "403MP",
-            message: "Missing or Invalid Parameter : customerID or sellerID is null.",
+            message:
+              "Missing or Invalid Parameter : customerID or sellerID is null.",
           });
         }
       }
@@ -280,14 +315,15 @@ const confirmed_order = async (req, res) => {
     //  console.log(req.body.lotteryList);
     for (const element of req.body.lotteryList) {
       let param = {
-        storeName: element.Storename,
+        // storeName: element.Storename,
         Number: element.Number,
-        // Draw: element.Draw,
-        // DrawDate: element.DrawDate,
+        Draw: element.Draw,
+        DrawDate: element.DrawDate,
         Storename: element.Storename,
         Pack: element.pack,
         Amount: element.Amount,
         Money: element.Money,
+        PackAmount: element.PackAmount,
       };
       errMsgCart += validateMethod(param);
     }
@@ -300,8 +336,6 @@ const confirmed_order = async (req, res) => {
       return;
     } else {
       var sellerMap = new Map();
-
-      // let List_ = []
       const decoded = jwt.verify(req.body.token, secret);
       const { username, role } = decoded;
       if (role == "customer") {
@@ -315,34 +349,36 @@ const confirmed_order = async (req, res) => {
             sellerMapList = sellerMap.get(element.Storename);
             sellerMapList.push({
               Number: element.Number,
-              // Draw: element.Draw,
-              // DrawDate: element.DrawDate,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
               Pack: element.pack,
               Storename: element.Storename,
               Amount: element.Amount,
               Money: element.Money,
+              PackAmount: element.PackAmount,
             });
             sellerMap.set(element.Storename, sellerMapList);
           } else {
             sellerMapList.push({
               Number: element.Number,
-              // Draw: element.Draw,
-              // DrawDate: element.DrawDate,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
               Pack: element.pack,
               Storename: element.Storename,
               Amount: element.Amount,
               Money: element.Money,
+              PackAmount: element.PackAmount,
             });
             sellerMap.set(element.Storename, sellerMapList);
           }
         }
-        let subTotal = 0;
         let firstShippingCharge = true;
         let firstOrder = true;
         let relatedID = "";
         let shippingCost = "";
         let infoOrderList_ = [];
         for (const [key, value] of sellerMap.entries()) {
+          let subTotal = 0;
           if (value.length > 1) {
             for (let i = 0; i < value.length; i++) {
               subTotal += parseInt(value[i].Money);
@@ -379,13 +415,94 @@ const confirmed_order = async (req, res) => {
             res,
             value,
             addOrder.OID,
+            results[0].CID,
             infoOrderList_
           );
           // console.log("in loop",infoOrderList_);
         }
-        // console.log("out loop",infoOrderList_)
+        console.log("out loop", infoOrderList_);
         if (infoOrderList_.length > 0) {
           await confirmedPayment(req, res, infoOrderList_, relatedID);
+          console.log("confirmed");
+        } else {
+          res.json({
+            status: "200LN",
+            message: "lottery is null",
+          });
+        }
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
+const updatePendingReview = async (req, res) => {
+  try {
+    let validateData = {
+      token: req.body.token,
+      OID: req.body.OID,
+      status: req.body.Status,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+      return;
+    } else {
+      const decoded = jwt.verify(req.body.token, secret);
+      const { username, role } = decoded;
+      if (role == "customer") {
+        await promiseOrder.execute(
+          "UPDATE order_c SET Status=? WHERE Status='Pending Review' and OID = ?",
+          [req.body.Status, req.body.OID]
+        );
+        if (req.body.Status == "Cancelled") {
+          await promiseLottery.execute(
+            "UPDATE singlelottery SET Status='Available',OID='' WHERE Status='reserved' and OID=?",
+            [req.body.OID]
+          );
+          await promiseLottery.execute(
+            "UPDATE packlottery SET Status='Available',OID='' WHERE Status='reserved' and OID=?",
+            [req.body.OID]
+          );
+          res.json({
+            status: "200OK",
+            message: "Cancelled success!!",
+          });
+        } else if (req.body.Status == "Pending Payment") {
+          let money = 0;
+          const [AllOID] = await promiseOrder.execute(
+            "SELECT OID FROM order_c WHERE OID=? or relateID=?",
+            [req.body.OID, req.body.OID]
+          );
+          for (let i = 0; i < AllOID.length; i++) {
+            let temp = 0;
+            const [S_lottery] = await promiseLottery.execute(
+              "SELECT * FROM singlelottery WHERE OID=?",
+              [AllOID[i].OID]
+            );
+            const [P_lottery] = await promiseLottery.execute(
+              "SELECT * FROM packlottery WHERE OID=?",
+              [AllOID[i].OID]
+            );
+            for (let i = 0; i < P_lottery.length; i++) {
+              temp += P_lottery[i].Amount;
+            }
+            money += (S_lottery.length + temp) * 80;
+          }
+          res.json({
+            status: "200OK",
+            message: "Pending Payment success!!",
+            newMoney: money,
+          });
         }
       } else {
         res.json({
@@ -663,6 +780,7 @@ const randomLottery = async (req, res) => {
               sellerID: temp[1],
               customerID: await getID(username, "customer", "Username"),
               lotteryPack: "N",
+              PackAmount: "-",
             });
           }
           console.log(lotteryMap);
@@ -688,6 +806,88 @@ const randomLottery = async (req, res) => {
   }
 };
 
+const getTransaction = async (req, res) => {
+  try {
+    let validateData = {
+      token: req.params.token,
+      //Amount: req.body.Amount,
+    };
+    const errMsg = validateMethod(validateData);
+    if (errMsg.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter : " + errMsg,
+      });
+    } else {
+      const decoded = jwt.verify(req.params.token, secret);
+      const { username, role } = decoded;
+      if (role == "customer") {
+        const [customerID] = await promiseCustomer.execute(
+          "SELECT CID FROM customer_account WHERE Username=?",
+          [username]
+        );
+        const [order] = await promiseOrder.execute(
+          "SELECT x.OID,x.Status,y.Number_lottery,y.Lot,y.Draw,y.DrawDate FROM order_c x INNER JOIN transaction y ON x.OID=y.OID WHERE CID=?",
+          [customerID[0].CID]
+        );
+
+        let orderMap = new Map();
+        for (const element of order) {
+          let orderLotteryList = [];
+          let key = element.OID + "|" + element.Status;
+          let packFlag = element.Lot.includes("|") ? "Y" : "N";
+          let packAmount = element.Lot.split("|").length > 1 ? String(element.Lot.split("|").length) : "-" 
+          if (orderMap.has(key)) {
+            orderLotteryList = orderMap.get(key);
+            orderLotteryList.push({
+              Number: element.Number_lottery,
+              Lot: element.Lot,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
+              PackFlag: packFlag,
+              PackAmount: packAmount
+            });
+            orderMap.set(key, orderLotteryList);
+          } else {
+            orderLotteryList.push({
+              Number: element.Number_lottery,
+              Lot: element.Lot,
+              Draw: element.Draw,
+              DrawDate: element.DrawDate,
+              PackFlag: packFlag,
+              PackAmount: packAmount
+            });
+            orderMap.set(key, orderLotteryList);
+          }
+        }
+        let resultOrder = [];
+        for (const [key, value] of orderMap.entries()) {
+          let temp = key.split("|");
+          let params = {
+            OID: temp[0],
+            Status: temp[1],
+            LotteryList: value,
+          };
+          resultOrder.push(params);
+        }
+        console.log(order);
+        res.json({
+          status: "200OK",
+          message: "get transaction Success!!",
+          orderTransaction: resultOrder,
+        });
+      } else {
+        res.json({
+          status: "401UR",
+          message: "Unauthorized",
+        });
+      }
+    }
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
+  }
+};
+
 module.exports = {
   add_cart,
   get_cart,
@@ -698,6 +898,8 @@ module.exports = {
   getSellerCheckOrder,
   updateSellerCheckOrder,
   randomLottery,
+  updatePendingReview,
+  getTransaction,
 };
 
 const getName = async (ID, role, key) => {
@@ -708,6 +910,7 @@ const getName = async (ID, role, key) => {
   let fullName = FullName[0].Firstname + " " + FullName[0].Lastname;
   return fullName;
 };
+
 const getID = async (username, role, key) => {
   const [ID] = await promiseCustomer.execute(
     "SELECT CID FROM " + role + "_account WHERE " + key + "=?",
@@ -717,9 +920,18 @@ const getID = async (username, role, key) => {
   return ID[0].CID;
 };
 
+const getSellerID = async (Storename, role, key) => {
+  const [ID] = await promiseCustomer.execute(
+    "SELECT SID FROM " + role + "_account WHERE " + key + "=?",
+    [Storename]
+  );
+  console.log(ID);
+  return ID[0].SID;
+};
+
 const checkErrorAddCart = async (req, res, params) => {
   let errInCart = "";
-  
+
   for (const [key, value] of Object.entries(params)) {
     if (value == "" || value == null) {
       errInCart += key;
@@ -733,13 +945,15 @@ const checkErrorAddCart = async (req, res, params) => {
     return false;
   } else {
     await promiseOrder.execute(
-      "INSERT INTO cart (Number_lottery,Amount,SID,CID,Pack_Flag) VALUES (?,?,?,?,?)",
+      "INSERT INTO cart (Number_lottery,Amount,SID,CID,Pack_Flag,PackAmount,DrawDate) VALUES (?,?,?,?,?,?,?)",
       [
         params.Number,
         params.Amount,
         params.sellerID,
         params.customerID,
         params.lotteryPack,
+        params.PackAmount,
+        params.DrawDate
       ]
     );
   }
@@ -832,14 +1046,26 @@ const getStorename = async (SID) => {
   return storename[0].Storename;
 };
 
-const updateOutOfStock = async (Number, SID, CID) => {
+const updateOutOfStock = async (Number, SID, CID, PackAmount) => {
+  // console.log('updateOutOfStock')
+  // SID = (SID == undefined) ? "" : SID
+  // console.log('Number',Number)
+  // console.log('CID',CID)
+  // console.log('SID: ',SID)
   await promiseOrder.execute(
-    "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=? ",
-    [Number, SID, CID]
+    "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=? and  PackAmount=?",
+    [Number, SID, CID, PackAmount]
   );
 };
 
-const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
+const OrderConfirmedLottery = async (
+  req,
+  res,
+  orderList,
+  OID,
+  CID,
+  infoList
+) => {
   let lotteryOrderList = infoList.length > 0 ? infoList[0].lotteryList : [];
   let errorOrderList = infoList.length > 0 ? infoList[0].errorList : [];
   let infoOrderList = [];
@@ -849,12 +1075,17 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
         console.log("element", element);
         if (element.Pack != null && element.Pack == "Y") {
           console.log("pack!");
+          console.log("number", element.Number);
           const [packLottery] = await promiseLottery.execute(
-            "SELECT * FROM packlottery WHERE status='Available' and Number=?",
-            [element.Number]
+            "SELECT * FROM packlottery WHERE status='Available' and Number=? and Amount=?",
+            [element.Number, element.PackAmount]
           );
-          //const Storename = await getStorename(element.SID);
-          console.log("packlottery",packLottery)
+          const SID = await getSellerID(
+            element.Storename,
+            "seller",
+            "Storename"
+          );
+          console.log("packlottery", packLottery);
           if (packLottery.length > 0) {
             let orderSize =
               packLottery.length >= element.Amount
@@ -866,14 +1097,15 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
                 Amount: element.Amount,
                 Stock: packLottery.length,
                 Storename: element.Storename,
-                SID: element.SID,
+                PackAmount: element.PackAmount,
+                SID: SID,
                 Status: "Changed Amount",
               });
             }
+            console.log("orderSize", orderSize);
             for (let i = 0; i < orderSize; i++) {
               await promiseLottery.execute(
                 "UPDATE packlottery SET Status=? , OID=? WHERE Number=? and Lot=? and Draw=?",
-               
                 [
                   "reserved",
                   OID,
@@ -890,18 +1122,24 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
               Amount: element.Amount,
               Stock: packLottery.length,
               Storename: element.Storename,
-              SID: element.SID,
+              PackAmount: element.PackAmount,
+              SID: SID,
               Status: "Changed Amount",
             });
-            updateOutOfStock(element.Number, element.SID, element.CID);
+            updateOutOfStock(element.Number, SID, CID, element.PackAmount);
           }
         } else {
-          console.log("single");
+          //console.log("single");
+          const SID = await getSellerID(
+            element.Storename,
+            "seller",
+            "Storename"
+          );
           const [singleLottery] = await promiseLottery.execute(
             "SELECT * FROM singlelottery WHERE status='Available' and Number=?",
             [element.Number]
           );
-          console.log("singleLottery", singleLottery);
+          //console.log("singleLottery", singleLottery);
           if (singleLottery.length > 0) {
             let orderSize =
               singleLottery.length >= element.Amount
@@ -913,11 +1151,12 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
                 Amount: element.Amount,
                 Stock: singleLottery.length,
                 Storename: element.Storename,
-                SID: element.SID,
+                PackAmount: element.PackAmount,
+                SID: SID,
                 Status: "Changed Amount",
               });
             }
-            console.log("orderSize", orderSize);
+            //  console.log("orderSize", orderSize);
             for (let i = 0; i < orderSize; i++) {
               await promiseLottery.execute(
                 "UPDATE singlelottery SET Status='reserved' , OID=? WHERE Number=? and Lot=? and Draw=?",
@@ -929,19 +1168,20 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
                 ]
               );
               lotteryOrderList.push(singleLottery[i]);
-              console.log("lotteryList loop", lotteryOrderList);
+              //    console.log("lotteryList loop", lotteryOrderList);
             }
-            console.log("lotteryList", lotteryOrderList);
+            //  console.log("lotteryList", lotteryOrderList);
           } else {
             errorOrderList.push({
               Number: element.Number,
               Amount: element.Amount,
               Stock: singleLottery.length,
               Storename: element.Storename,
-              SID: element.SID,
+              PackAmount: element.PackAmount,
+              SID: SID,
               Status: "Changed Amount",
             });
-            updateOutOfStock(element.Number, element.SID, element.CID);
+            updateOutOfStock(element.Number, SID, CID, element.PackAmount);
           }
         }
       }
@@ -949,7 +1189,14 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
         lotteryList: lotteryOrderList,
         errorList: errorOrderList,
       });
-      console.log("infoOrderList in function: ", infoOrderList[0].lotteryList);
+      console.log(
+        "infoOrderList lotteryList in function: ",
+        infoOrderList[0].lotteryList
+      );
+      console.log(
+        "infoOrderList errorList in function: ",
+        infoOrderList[0].errorList
+      );
     }
     return infoOrderList;
   } catch (error) {
@@ -959,27 +1206,45 @@ const OrderConfirmedLottery = async (req, res, orderList, OID, infoList) => {
 
 const confirmedPayment = async (req, res, infoOrderList, OID) => {
   try {
+    console.log(OID);
     if (infoOrderList[0].errorList.length == 0) {
+      console.log("No Error");
       await promiseOrder.execute(
         "UPDATE order_c SET Status='Pending Payment' WHERE OID=? or relateId =?",
         [OID, OID]
       );
+      console.log("Update No Error");
       res.json({
         status: "200OK",
         message: "You can payment.",
         orderID: OID,
       });
+      return;
     } else {
+      let out = true;
+      for (const element of infoOrderList[0].errorList) {
+        if (element.Stock > 0) {
+          out = false;
+        }
+      }
+      console.log("Error");
+      let status = out ? "Cancelled" : "Pending Review";
       await promiseOrder.execute(
-        "UPDATE order_c SET Status='Pending Review' WHERE OID=? or relateId =?",
-        [OID, OID]
+        "UPDATE order_c SET Status=? WHERE OID=? or relateId = ?",
+        [status, parseInt(OID), OID]
       );
+      console.log("Update Error");
+      if (status == "Cancelled") {
+        checkAddTransaction(res, infoOrderList[0].errorList);
+      }
       res.json({
         status: "200CE", //check Error
         message: "Please review!",
         ListError: infoOrderList[0].errorList,
+        Status: status,
         orderID: OID,
       });
+      return;
     }
   } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });

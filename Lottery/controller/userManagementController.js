@@ -66,7 +66,7 @@ const login = (req, res) => {
                   { username: users[0].Username, role: users[0].Role },
                   secret,
                   {
-                    expiresIn: "1h",
+                    expiresIn: "3h",
                   }
                 );
                 res.json({ status: "200OK", message: "Login success", token });
@@ -97,11 +97,11 @@ const register = (req, res, next) => {
     let roleUser = "";
     console.log(req.body);
     let validateData = {
-      Title:req.body.Title,
+      Title: req.body.Title,
       Firstname: req.body.Firstname,
       Lastname: req.body.Lastname,
-      Username:req.body.Username,
-      Password:req.body.Password,
+      Username: req.body.Username,
+      Password: req.body.Password,
       Tel: req.body.Tel,
       Birthday: req.body.Birthday,
       Email: req.body.Email,
@@ -115,11 +115,11 @@ const register = (req, res, next) => {
         ZipCode: req.body.Address.ZipCode,
       },
       IDCard: req.body.IDCard,
-      wantToBeSeller:req.body.wantToBeSeller,
-      URLImage:req.body.URLImage,
+      wantToBeSeller: req.body.wantToBeSeller,
+      URLImage: req.body.URLImage,
     };
     for (const [key, value] of Object.entries(validateData)) {
-      console.log(value)
+      console.log(value);
       if (key == "Address") {
         for (const [key, value] of Object.entries(validateData.Address)) {
           if (value == null || value == "" || value == []) {
@@ -127,12 +127,12 @@ const register = (req, res, next) => {
           }
         }
       }
-      console.log(validateData.wantToBeSeller=="No")
-      if (key == "URLImage" && validateData.wantToBeSeller=="No") {
+      console.log(validateData.wantToBeSeller == "No");
+      if (key == "URLImage" && validateData.wantToBeSeller == "No") {
         continue;
-      } else if(key == "wantToBeSeller" && value != null){
+      } else if (key == "wantToBeSeller" && value != null) {
         continue;
-      }else  if (value == null || value == "" || value == []) {
+      } else if (value == null || value == "" || value == []) {
         Msg += key + " ";
       }
     }
@@ -383,6 +383,7 @@ const customerUpdateAccount = (req, res) => {
       });
       return;
     }
+    console.log(req.body)
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
       res.json({
@@ -410,6 +411,7 @@ const customerUpdateAccount = (req, res) => {
               return;
             } else {
               if (req.params.action == "ChangeImage") {
+                
                 connectionCustomer.execute(
                   "UPDATE customer_account SET URL_image_profile=? WHERE Username=? ",
                   [req.body.URL_image_profile, username],
@@ -428,6 +430,7 @@ const customerUpdateAccount = (req, res) => {
                   }
                 );
               } else if (req.params.action == "ChangeAccountInfo") {
+                // console.log(req.body)
                 connectionCustomer.execute(
                   "UPDATE customer_account SET Firstname=?,Lastname=?,Email=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=? WHERE Username=?",
                   [

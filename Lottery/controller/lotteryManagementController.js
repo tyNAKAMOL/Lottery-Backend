@@ -27,6 +27,7 @@ const validateMethod = (vd) => {
   }
   return errMsg;
 };
+
 const validateMethodLottery = (vd, Pack) => {
   let errMsg = "";
   for (const [key, value] of Object.entries(vd)) {
@@ -386,7 +387,7 @@ const search_Lottery = async (req, res) => {
           }
         }
         const [P_lottery] = await promiseLottery.execute(
-          "SELECT x.Number, x.Draw, x.DrawDate,x.Status,y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%" +
+          "SELECT x.Number, x.Draw, x.DrawDate,x.Status,x.Amount,y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%" +
             lotterySearch +
             "%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename"
         );
