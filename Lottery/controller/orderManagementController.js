@@ -43,11 +43,13 @@ const validateMethod = (vd) => {
 const add_cart = async (req, res) => {
   try {
     let validateData = {
-      token: req.body.token,
-      Number: req.body.Number_lottery,
-      Amount: req.body.Amount,
-      lotteryPack: req.body.Pack_Flag,
-      StoreName: req.body.Storename,
+      token : req.body.token,
+      Number : req.body.Number_lottery,
+      Amount : req.body.Amount,
+      lotteryPack : req.body.Pack_Flag,
+      StoreName : req.body.Storename,
+      DrawDate : req.body.DrawDate,
+      PackAmount: req.body.PackAmount,
     };
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
