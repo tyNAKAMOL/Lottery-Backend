@@ -66,7 +66,7 @@ const login = (req, res) => {
                   { username: users[0].Username, role: users[0].Role },
                   secret,
                   {
-                    expiresIn: "3h",
+                    expiresIn: "10h",
                   }
                 );
                 res.json({ status: "200OK", message: "Login success", token });

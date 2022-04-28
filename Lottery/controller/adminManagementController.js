@@ -85,7 +85,7 @@ const getSellerIdentity = async (req, res) => {
                 ZipCode: result[i].ZipCode,
               },
               Storename: result[i].Storename,
-              URLImage: result[i].URL_image_profile,
+              URLImage: result[i].URLImage,
             });
           }
           res.json({
@@ -110,6 +110,7 @@ const getSellerIdentity = async (req, res) => {
 };
 
 const updateStatusSeller = async (req, res) => {
+  console.log("iden",req.body)
   try {
     let validateData = {
       token: req.body.token,
@@ -505,6 +506,7 @@ const getCommon = async (req, res) => {
             let orderInfo = {
               OID: result[0].OID,
               Tracking_Number: result[0].Tracking_Number,
+              CID:result[0].CID,
               FullName: await getName(result[0].CID, "customer", "CID"),
               Address: Address,
               lotteryList: lotteryList,

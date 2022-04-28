@@ -520,6 +520,7 @@ const updatePendingReview = async (req, res) => {
 
 const update_URLSlip = async (req, res) => {
   const lotteryList = [];
+  console.log("--ttt--",req.body)
   try {
     let validateData = {
       token: req.body.token,
