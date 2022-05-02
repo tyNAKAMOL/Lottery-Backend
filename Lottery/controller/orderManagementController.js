@@ -43,12 +43,12 @@ const validateMethod = (vd) => {
 const add_cart = async (req, res) => {
   try {
     let validateData = {
-      token : req.body.token,
-      Number : req.body.Number_lottery,
-      Amount : req.body.Amount,
-      lotteryPack : req.body.Pack_Flag,
-      StoreName : req.body.Storename,
-      DrawDate : req.body.DrawDate,
+      token: req.body.token,
+      Number: req.body.Number_lottery,
+      Amount: req.body.Amount,
+      lotteryPack: req.body.Pack_Flag,
+      StoreName: req.body.Storename,
+      DrawDate: req.body.DrawDate,
       PackAmount: req.body.PackAmount,
     };
     const errMsg = validateMethod(validateData);
@@ -89,7 +89,7 @@ const add_cart = async (req, res) => {
               customerID[0].CID,
               req.body.Pack_Flag,
               req.body.PackAmount,
-              req.body.DrawDate
+              req.body.DrawDate,
             ]
           );
           console.log(DupLottery);
@@ -104,7 +104,7 @@ const add_cart = async (req, res) => {
                 req.body.Number_lottery,
                 sellerID[0].SID,
                 req.body.PackAmount,
-                req.body.DrawDate
+                req.body.DrawDate,
               ]
             );
             res.json({
@@ -420,7 +420,6 @@ const confirmed_order = async (req, res) => {
             results[0].CID,
             infoOrderList_
           );
-          // console.log("in loop",infoOrderList_);
         }
         console.log("out loop", infoOrderList_);
         if (infoOrderList_.length > 0) {
@@ -468,11 +467,11 @@ const updatePendingReview = async (req, res) => {
         );
         if (req.body.Status == "Cancelled") {
           await promiseLottery.execute(
-            "UPDATE singlelottery SET Status='Available',OID='' WHERE Status='reserved' and OID=?",
+            "UPDATE singlelottery SET Status='Available', OID = '' WHERE Status='reserved' and OID=?",
             [req.body.OID]
           );
           await promiseLottery.execute(
-            "UPDATE packlottery SET Status='Available',OID='' WHERE Status='reserved' and OID=?",
+            "UPDATE packlottery SET Status='Available', OID='' WHERE Status='reserved' and OID=?",
             [req.body.OID]
           );
           res.json({
@@ -520,7 +519,7 @@ const updatePendingReview = async (req, res) => {
 
 const update_URLSlip = async (req, res) => {
   const lotteryList = [];
-  console.log("--ttt--",req.body)
+  console.log("--ttt--", req.body);
   try {
     let validateData = {
       token: req.body.token,
@@ -568,7 +567,12 @@ const update_URLSlip = async (req, res) => {
             }
           }
           console.log(lotteryList);
-          let addTransaction = await checkAddTransaction(req, res, lotteryList);
+          let addTransaction = await checkAddTransaction(
+            req,
+            res,
+            lotteryList,
+            "-"
+          );
           if (addTransaction) {
             await promiseOrder.execute("DELETE FROM cart WHERE CID=?", [
               status[0].CID,
@@ -625,7 +629,7 @@ const getSellerCheckOrder = async (req, res) => {
           [username]
         );
         const [result] = await promiseOrder.execute(
-          "SELECT * FROM order_c INNER JOIN transaction on order_c.OID = transaction.OID where transaction.SID = ?",
+          "SELECT * FROM order_c INNER JOIN transaction on order_c.OID = transaction.OID where transaction.SID = ? and order_c.Status = 'Seller Check Order' ",
           [SID[0].SID]
         );
         if (result.length == 0) {
@@ -647,8 +651,8 @@ const getSellerCheckOrder = async (req, res) => {
           }
           res.json({
             status: "200OK",
-            message: "get orderPayment success!!",
-            orderPayment: order,
+            message: "get order success!!",
+            order: order,
           });
         }
       } else {
@@ -766,13 +770,23 @@ const randomLottery = async (req, res) => {
           let lotteryMap = new Map();
           for (const element of lottery) {
             //xxxxxx|yyy
-            if (!lotteryMap.has(element.Number + "|" + element.SID)) {
-              lotteryMap.set(element.Number + "|" + element.SID, "1");
+            if (
+              !lotteryMap.has(
+                element.Number + "|" + element.SID + "|" + element.DrawDate
+              )
+            ) {
+              lotteryMap.set(
+                element.Number + "|" + element.SID + "|" + element.DrawDate,
+                "1"
+              );
             } else {
               let num =
                 parseInt(lotteryMap.get(element.Number + "|" + element.SID)) +
                 1;
-              lotteryMap.set(element.Number + "|" + element.SID, String(num));
+              lotteryMap.set(
+                element.Number + "|" + element.SID + "|" + element.DrawDate,
+                String(num)
+              );
             }
           }
           for (const [key, value] of lotteryMap.entries()) {
@@ -784,6 +798,7 @@ const randomLottery = async (req, res) => {
               customerID: await getID(username, "customer", "Username"),
               lotteryPack: "N",
               PackAmount: "-",
+              DrawDate: temp[2],
             });
           }
           console.log(lotteryMap);
@@ -839,7 +854,10 @@ const getTransaction = async (req, res) => {
           let orderLotteryList = [];
           let key = element.OID + "|" + element.Status;
           let packFlag = element.Lot.includes("|") ? "Y" : "N";
-          let packAmount = element.Lot.split("|").length > 1 ? String(element.Lot.split("|").length) : "-" 
+          let packAmount =
+            element.Lot.split("|").length > 1
+              ? String(element.Lot.split("|").length)
+              : "-";
           if (orderMap.has(key)) {
             orderLotteryList = orderMap.get(key);
             orderLotteryList.push({
@@ -848,7 +866,7 @@ const getTransaction = async (req, res) => {
               Draw: element.Draw,
               DrawDate: element.DrawDate,
               PackFlag: packFlag,
-              PackAmount: packAmount
+              PackAmount: packAmount,
             });
             orderMap.set(key, orderLotteryList);
           } else {
@@ -858,7 +876,7 @@ const getTransaction = async (req, res) => {
               Draw: element.Draw,
               DrawDate: element.DrawDate,
               PackFlag: packFlag,
-              PackAmount: packAmount
+              PackAmount: packAmount,
             });
             orderMap.set(key, orderLotteryList);
           }
@@ -956,7 +974,7 @@ const checkErrorAddCart = async (req, res, params) => {
         params.customerID,
         params.lotteryPack,
         params.PackAmount,
-        params.DrawDate
+        params.DrawDate,
       ]
     );
   }
@@ -1002,7 +1020,7 @@ const checkAddOrder = async (req, res, params) => {
   return orderResult;
 };
 
-const checkAddTransaction = async (req, res, lotteryList) => {
+const checkAddTransaction = async (req, res, lotteryList, Status) => {
   let errList = [];
   for (const element of lotteryList) {
     if (
@@ -1026,7 +1044,7 @@ const checkAddTransaction = async (req, res, lotteryList) => {
   } else {
     for (const element of lotteryList) {
       await promiseOrder.execute(
-        "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID) VALUES (?,?,?,?,?,?)",
+        "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID,Status) VALUES (?,?,?,?,?,?,?)",
         [
           element.Number,
           element.Lot,
@@ -1034,6 +1052,7 @@ const checkAddTransaction = async (req, res, lotteryList) => {
           element.DrawDate,
           element.SID,
           element.OID,
+          Status,
         ]
       );
     }
@@ -1171,9 +1190,7 @@ const OrderConfirmedLottery = async (
                 ]
               );
               lotteryOrderList.push(singleLottery[i]);
-              //    console.log("lotteryList loop", lotteryOrderList);
             }
-            //  console.log("lotteryList", lotteryOrderList);
           } else {
             errorOrderList.push({
               Number: element.Number,
@@ -1238,7 +1255,12 @@ const confirmedPayment = async (req, res, infoOrderList, OID) => {
       );
       console.log("Update Error");
       if (status == "Cancelled") {
-        checkAddTransaction(res, infoOrderList[0].errorList);
+        checkAddTransaction(
+          req,
+          res,
+          infoOrderList[0].errorList,
+          "Out of Stock"
+        );
       }
       res.json({
         status: "200CE", //check Error

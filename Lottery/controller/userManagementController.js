@@ -383,7 +383,7 @@ const customerUpdateAccount = (req, res) => {
       });
       return;
     }
-    console.log(req.body)
+    console.log(req.body);
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
       res.json({
@@ -411,7 +411,6 @@ const customerUpdateAccount = (req, res) => {
               return;
             } else {
               if (req.params.action == "ChangeImage") {
-                
                 connectionCustomer.execute(
                   "UPDATE customer_account SET URL_image_profile=? WHERE Username=? ",
                   [req.body.URL_image_profile, username],
@@ -565,13 +564,11 @@ const sellerUpdateAccount = (req, res) => {
                 );
               } else if (req.params.action == "ChangeAccountInfo") {
                 connectionCustomer.execute(
-                  "UPDATE seller_account SET Title=?,Firstname=?,Lastname=?,Email=?,Birthday=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=?,Storename=? WHERE Username=?",
+                  "UPDATE seller_account SET Firstname=?,Lastname=?,Email=?,Tel=?,HomeNo=?,Soi=?,Road=?,Subdistrict=?,District=?,Province=?,ZipCode=?,Storename=? WHERE Username=?",
                   [
-                    req.body.Title,
                     req.body.Firstname,
                     req.body.Lastname,
                     req.body.Email,
-                    req.body.Birthday,
                     req.body.Tel,
                     req.body.Address.HomeNo,
                     req.body.Address.Soi,
@@ -796,7 +793,7 @@ const getBankSeller = (req, res) => {
               res.json({
                 status: "200OK",
                 message: "get Seller Bank Success",
-                sellenBack: sellerBank,
+                sellerBank: sellerBank,
               });
             }
           }

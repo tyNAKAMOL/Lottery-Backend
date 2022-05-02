@@ -110,8 +110,8 @@ const getSellerIdentity = async (req, res) => {
 };
 
 const updateStatusSeller = async (req, res) => {
-  console.log("iden",req.body)
   try {
+    console.log("iden",req.body)
     let validateData = {
       token: req.body.token,
       approve: req.body.approve, // send "Yes" or "No"

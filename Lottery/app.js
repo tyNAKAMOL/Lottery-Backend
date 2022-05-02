@@ -10,14 +10,19 @@ const lotteryManagementRoutes = require("./routes/lotteryManagementRoutes");
 const adminManagementRoutes = require("./routes/adminManagementRoutes");
 
 var app = express();
-app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 app.use(function (req, res, next) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE , PATCH"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Accept, Authorization, Origin, X-Requested-With"
+  );
   res.setHeader("Access-Control-Allow-Credentials", true);
   next();
 });
@@ -27,6 +32,7 @@ app.use(orderManagementRoutes.routes);
 app.use(lotteryManagementRoutes.routes);
 app.use(adminManagementRoutes.routes);
 
+app.use(cors());
 app.use(router).listen(3333, function () {
   console.log("Server Started...");
 });
