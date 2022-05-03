@@ -222,7 +222,7 @@ const getLotteryForSeller = async (req, res) => {
         const [S_lottery] = await promiseLottery.execute(
           "SELECT x.Number, x.Draw, x.DrawDate,x.Status,x.Lot,y.Storename,y.SID, count(x.Number) AS Stock FROM lottery.singlelottery x JOIN customer.seller_account y on x.SID=y.SID and y.SID=" +
             sellerID[0].SID +
-            " WHERE x.Status='Available' Group By x.Number, x.Draw, y.Storename"
+            " Group By x.Number, x.Draw, y.Storename"
         );
         if (S_lottery.length > 0) {
           for (let i = 0; i < S_lottery.length; i++) {
@@ -233,7 +233,7 @@ const getLotteryForSeller = async (req, res) => {
         const [P_lottery] = await promiseLottery.execute(
           "SELECT x.Number, x.Draw,x.Amount,x.Status,x.Lot,x.DrawDate, y.Storename,y.SID, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID and y.SID=" +
             sellerID[0].SID +
-            " WHERE x.Status='Available' Group By x.Number, x.Draw, x.Amount, y.Storename"
+            " Group By x.Number, x.Draw, x.Amount, y.Storename"
         );
         if (P_lottery.length > 0) {
           for (let i = 0; i < P_lottery.length; i++) {
@@ -261,8 +261,8 @@ const getLotteryForSeller = async (req, res) => {
 const delete_Lottery = async (req, res) => {
   try {
     let validatePack = {
-      Pack:req.body.pack
-    }
+      pack: req.body.pack,
+    };
     const errMsg1 = validateMethod(validatePack);
     if (errMsg1.length > 0) {
       res.json({
@@ -271,43 +271,53 @@ const delete_Lottery = async (req, res) => {
       });
       return;
     } else {
-    let validateData = {
-      token: req.body.token,
-      sellerID:req.body.SID,
-      lottery:req.body.Number_lottery,
-      Lot:req.body.Lot,
-      Draw:req.body.Draw,
-      DrawDate:req.body.DrawDate,
-    };
-    if(req.body.pack=="Y"){
-      validateData["Amount"] = req.body.Amount
-    }
-    const errMsg = validateMethod(validateData);
-    if (errMsg.length > 0) {
-      res.json({
-        status: "403MP",
-        message: "Missing or Invalid Parameter : " + errMsg,
-      });
-      return;
-    } else {
-      const decoded = jwt.verify(req.body.token, secret);
-      const { username, role } = decoded;
-      const [SID] = await promiseCustomer.execute(
-        "SELECT SID FROM seller_account WHERE Username=?",[username]
-      )
-      let key = req.body.pack=="Y" ? "pack":"single"
-      if (role == "seller" && SID[0].SID == req.body.SID) {
+      let validateData = {
+        token: req.body.token,
+        sellerID: req.body.SID,
+        lottery: req.body.Number_lottery,
+        Lot: req.body.Lot,
+        Draw: req.body.Draw,
+        DrawDate: req.body.DrawDate,
+      };
+      if (req.body.pack == "Y") {
+        validateData["Amount"] = req.body.Amount;
+      }
+      const errMsg = validateMethod(validateData);
+      if (errMsg.length > 0) {
+        res.json({
+          status: "403MP",
+          message: "Missing or Invalid Parameter : " + errMsg,
+        });
+        return;
+      } else {
+        const decoded = jwt.verify(req.body.token, secret);
+        const { username, role } = decoded;
+        const [SID] = await promiseCustomer.execute(
+          "SELECT SID FROM seller_account WHERE Username=?",
+          [username]
+        );
+        let key = req.body.pack == "Y" ? "pack" : "single";
+        if (role == "seller" && SID[0].SID == req.body.SID) {
           await promiseLottery.execute(
-            "DELETE FROM "+key+"lottery WHERE Number=? and SID=? and Lot=? and Draw=? and DrawDate=? and Status='Available'",
-            [req.body.Number_lottery, req.body.SID, req.body.Lot,req.body.Draw,req.body.DrawDate]
+            "DELETE FROM " +
+              key +
+              "lottery WHERE Number=? and SID=? and Lot=? and Draw=? and DrawDate=? and Status='Available'",
+            [
+              req.body.Number_lottery,
+              req.body.SID,
+              req.body.Lot,
+              req.body.Draw,
+              req.body.DrawDate,
+            ]
           );
           res.json({
             status: "200OK",
             message: "seller remove lottery from store success!!",
           });
+        }
       }
     }
-  }} catch (error) {
+  } catch (error) {
     res.json({ status: "500IS", message: "Internal Server : " + error });
   }
 };
@@ -389,7 +399,7 @@ const search_Lottery = async (req, res) => {
         const [P_lottery] = await promiseLottery.execute(
           "SELECT x.Number, x.Draw, x.DrawDate,x.Status,x.Amount,y.Storename, count(x.Number) AS Stock FROM lottery.packlottery  x JOIN customer.seller_account y on x.SID=y.SID WHERE x.Number LIKE '%" +
             lotterySearch +
-            "%' and x.Status='Available' Group By x.Number, x.Draw, y.Storename"
+            "%' and x.Status='Available' Group By x.Number, x.Draw, x.Amount, y.Storename"
         );
         if (P_lottery.length > 0) {
           for (let i = 0; i < P_lottery.length; i++) {
@@ -418,7 +428,7 @@ module.exports = {
   get_lottery,
   search_Lottery,
   getLotteryForSeller,
-  delete_Lottery
+  delete_Lottery,
 };
 
 const countAddSingleLottery = async (req, res, results) => {

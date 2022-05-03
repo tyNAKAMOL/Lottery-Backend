@@ -254,6 +254,7 @@ const delete_cart = async (req, res) => {
       PackAmount: req.body.PackAmount,
     };
     console.log("req", validateData);
+    console.log("body req -> ", req.body);
     const errMsg = validateMethod(validateData);
     if (errMsg.length > 0) {
       res.json({
@@ -461,6 +462,10 @@ const updatePendingReview = async (req, res) => {
       const decoded = jwt.verify(req.body.token, secret);
       const { username, role } = decoded;
       if (role == "customer") {
+        const [CID] = await promiseCustomer.execute(
+          "SELECT CID FROM customer_account WHERE Username=?",
+          [username]
+        );
         await promiseOrder.execute(
           "UPDATE order_c SET Status=? WHERE Status='Pending Review' and OID = ?",
           [req.body.Status, req.body.OID]
@@ -474,6 +479,9 @@ const updatePendingReview = async (req, res) => {
             "UPDATE packlottery SET Status='Available', OID='' WHERE Status='reserved' and OID=?",
             [req.body.OID]
           );
+          await promiseOrder.execute("DELETE FROM cart WHERE CID=?", [
+            CID[0].CID,
+          ]);
           res.json({
             status: "200OK",
             message: "Cancelled success!!",
@@ -1022,6 +1030,7 @@ const checkAddOrder = async (req, res, params) => {
 
 const checkAddTransaction = async (req, res, lotteryList, Status) => {
   let errList = [];
+  console.log(lotteryList)
   for (const element of lotteryList) {
     if (
       element.Number == "" ||
@@ -1042,13 +1051,16 @@ const checkAddTransaction = async (req, res, lotteryList, Status) => {
     });
     return false;
   } else {
+    //add condition
     for (const element of lotteryList) {
+      let Lot = element.Lot == undefined ? "-" : element.Lot
+      let Draw = element.Draw == undefined ? "-" : element.Draw
       await promiseOrder.execute(
         "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID,Status) VALUES (?,?,?,?,?,?,?)",
         [
           element.Number,
-          element.Lot,
-          element.Draw,
+          Lot,
+          Draw,
           element.DrawDate,
           element.SID,
           element.OID,
@@ -1069,11 +1081,12 @@ const getStorename = async (SID) => {
 };
 
 const updateOutOfStock = async (Number, SID, CID, PackAmount) => {
-  // console.log('updateOutOfStock')
+  console.log("updateOutOfStock");
   // SID = (SID == undefined) ? "" : SID
-  // console.log('Number',Number)
-  // console.log('CID',CID)
-  // console.log('SID: ',SID)
+  console.log("Number", Number);
+  console.log("CID", CID);
+  console.log("SID: ", SID);
+  console.log("PackAmount: ", PackAmount);
   await promiseOrder.execute(
     "DELETE FROM cart WHERE Number_lottery=? and SID=? and CID=? and  PackAmount=?",
     [Number, SID, CID, PackAmount]
@@ -1091,6 +1104,7 @@ const OrderConfirmedLottery = async (
   let lotteryOrderList = infoList.length > 0 ? infoList[0].lotteryList : [];
   let errorOrderList = infoList.length > 0 ? infoList[0].errorList : [];
   let infoOrderList = [];
+  let Money = 0;
   try {
     if (orderList != null) {
       for (const element of orderList) {
@@ -1120,23 +1134,27 @@ const OrderConfirmedLottery = async (
                 Stock: packLottery.length,
                 Storename: element.Storename,
                 PackAmount: element.PackAmount,
+                DrawDate: element.DrawDate,
                 SID: SID,
                 Status: "Changed Amount",
               });
-            }
-            console.log("orderSize", orderSize);
-            for (let i = 0; i < orderSize; i++) {
-              await promiseLottery.execute(
-                "UPDATE packlottery SET Status=? , OID=? WHERE Number=? and Lot=? and Draw=?",
-                [
-                  "reserved",
-                  OID,
-                  packLottery[i].Number,
-                  packLottery[i].Lot,
-                  packLottery[i].Draw,
-                ]
-              );
-              lotteryOrderList.push(packLottery[i]);
+              updateOutOfStock(element.Number, SID, CID, element.PackAmount);
+              Money = Money + (element.PackAmount * element.Amount * 80);
+            } else {
+              console.log("orderSize", orderSize);
+              for (let i = 0; i < orderSize; i++) {
+                await promiseLottery.execute(
+                  "UPDATE packlottery SET Status=? , OID=? WHERE Number=? and Lot=? and Draw=?",
+                  [
+                    "reserved",
+                    OID,
+                    packLottery[i].Number,
+                    packLottery[i].Lot,
+                    packLottery[i].Draw,
+                  ]
+                );
+                lotteryOrderList.push(packLottery[i]);
+              }
             }
           } else {
             errorOrderList.push({
@@ -1145,10 +1163,12 @@ const OrderConfirmedLottery = async (
               Stock: packLottery.length,
               Storename: element.Storename,
               PackAmount: element.PackAmount,
+              DrawDate: element.DrawDate,
               SID: SID,
               Status: "Changed Amount",
             });
             updateOutOfStock(element.Number, SID, CID, element.PackAmount);
+            Money = Money + (element.PackAmount * element.Amount * 80);
           }
         } else {
           //console.log("single");
@@ -1174,23 +1194,27 @@ const OrderConfirmedLottery = async (
                 Stock: singleLottery.length,
                 Storename: element.Storename,
                 PackAmount: element.PackAmount,
+                DrawDate: element.DrawDate,
                 SID: SID,
                 Status: "Changed Amount",
               });
+              updateOutOfStock(element.Number, SID, CID, element.PackAmount);
+              Money = Money + (element.Amount * 80);
+            } else {
+              for (let i = 0; i < orderSize; i++) {
+                await promiseLottery.execute(
+                  "UPDATE singlelottery SET Status='reserved' , OID=? WHERE Number=? and Lot=? and Draw=?",
+                  [
+                    OID,
+                    singleLottery[i].Number,
+                    singleLottery[i].Lot,
+                    singleLottery[i].Draw,
+                  ]
+                );
+                lotteryOrderList.push(singleLottery[i]);
+              }
             }
             //  console.log("orderSize", orderSize);
-            for (let i = 0; i < orderSize; i++) {
-              await promiseLottery.execute(
-                "UPDATE singlelottery SET Status='reserved' , OID=? WHERE Number=? and Lot=? and Draw=?",
-                [
-                  OID,
-                  singleLottery[i].Number,
-                  singleLottery[i].Lot,
-                  singleLottery[i].Draw,
-                ]
-              );
-              lotteryOrderList.push(singleLottery[i]);
-            }
           } else {
             errorOrderList.push({
               Number: element.Number,
@@ -1198,13 +1222,23 @@ const OrderConfirmedLottery = async (
               Stock: singleLottery.length,
               Storename: element.Storename,
               PackAmount: element.PackAmount,
+              DrawDate: element.DrawDate,
               SID: SID,
               Status: "Changed Amount",
             });
             updateOutOfStock(element.Number, SID, CID, element.PackAmount);
+            Money = String(parseInt(Money) + parseInt(element.Amount * 80));
           }
         }
       }
+      const [money] = await promiseOrder.execute(
+        "SELECT Money FROM order_c WHERE OID=?",
+        [OID]
+      );
+      Money = String(parseInt(money[0].Money) - parseInt(Money))
+      await promiseOrder.execute(
+        "UPDATE order_c SET Money=? WHERE OID=?",[Money,OID]
+        )
       infoOrderList.push({
         lotteryList: lotteryOrderList,
         errorList: errorOrderList,
@@ -1242,18 +1276,22 @@ const confirmedPayment = async (req, res, infoOrderList, OID) => {
       return;
     } else {
       let out = true;
-      for (const element of infoOrderList[0].errorList) {
-        if (element.Stock > 0) {
-          out = false;
-        }
+      if(infoOrderList[0].lotteryList.length>0){
+        out = false;
       }
+      // for (const element of infoOrderList[0].errorList) {
+      //   if (element.Stock > 0) {
+      //     out = false;
+      //   }
+      // }
       console.log("Error");
-      let status = out ? "Cancelled" : "Pending Review";
+      let status = out ? "Cancelled" : "Pending Payment";
       await promiseOrder.execute(
         "UPDATE order_c SET Status=? WHERE OID=? or relateId = ?",
         [status, parseInt(OID), OID]
       );
       console.log("Update Error");
+      
       if (status == "Cancelled") {
         checkAddTransaction(
           req,
@@ -1261,6 +1299,7 @@ const confirmedPayment = async (req, res, infoOrderList, OID) => {
           infoOrderList[0].errorList,
           "Out of Stock"
         );
+      } else {
       }
       res.json({
         status: "200CE", //check Error
