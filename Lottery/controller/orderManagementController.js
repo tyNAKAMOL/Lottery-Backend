@@ -310,6 +310,7 @@ const delete_cart = async (req, res) => {
 
 const confirmed_order = async (req, res) => {
   try {
+    console.log(req.body);
     let validateToken = {
       token: req.body.token,
     };
@@ -426,6 +427,7 @@ const confirmed_order = async (req, res) => {
         if (infoOrderList_.length > 0) {
           await confirmedPayment(req, res, infoOrderList_, relatedID);
           console.log("confirmed");
+          return;
         } else {
           res.json({
             status: "200LN",
@@ -1030,46 +1032,91 @@ const checkAddOrder = async (req, res, params) => {
 
 const checkAddTransaction = async (req, res, lotteryList, Status) => {
   let errList = [];
+  console.log('checkAddTransaction')
   console.log(lotteryList)
-  for (const element of lotteryList) {
-    if (
-      element.Number == "" ||
-      element.Lot == "" ||
-      element.Draw == "" ||
-      element.DrawDate == "" ||
-      element.SID == "" ||
-      element.OID == ""
-    ) {
-      errList.push(element);
-    }
-  }
-  if (errList.length > 0) {
-    res.json({
-      status: "403MP",
-      message: "Missing or Invalid Parameter",
-      errorList: errList,
-    });
-    return false;
-  } else {
-    //add condition
+  try {
     for (const element of lotteryList) {
-      let Lot = element.Lot == undefined ? "-" : element.Lot
-      let Draw = element.Draw == undefined ? "-" : element.Draw
-      await promiseOrder.execute(
-        "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID,Status) VALUES (?,?,?,?,?,?,?)",
-        [
-          element.Number,
-          Lot,
-          Draw,
-          element.DrawDate,
-          element.SID,
-          element.OID,
-          Status,
-        ]
-      );
+      if (
+        element.Number == "" ||
+        element.Lot == "" ||
+        element.Draw == "" ||
+        element.DrawDate == "" ||
+        element.SID == "" ||
+        element.OID == ""
+      ) {
+        errList.push(element);
+      }
     }
-    return true;
+    if (errList.length > 0) {
+      res.json({
+        status: "403MP",
+        message: "Missing or Invalid Parameter",
+        errorList: errList,
+      });
+      return false;
+    } else {
+      //add condition
+      for (const element of lotteryList) {
+        let Lot = element.Lot == undefined ? "-" : element.Lot
+        let Draw = element.Draw == undefined ? "-" : element.Draw
+        await promiseOrder.execute(
+          "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID,Status) VALUES (?,?,?,?,?,?,?)",
+          [
+            element.Number,
+            Lot,
+            Draw,
+            element.DrawDate,
+            element.SID,
+            element.OID,
+            Status,
+          ]
+        );
+      }
+      return true;
+    }
+    
+  } catch (error) {
+    res.json({ status: "500IS", message: "Internal Server : " + error });
   }
+  // for (const element of lotteryList) {
+  //   if (
+  //     element.Number == "" ||
+  //     element.Lot == "" ||
+  //     element.Draw == "" ||
+  //     element.DrawDate == "" ||
+  //     element.SID == "" ||
+  //     element.OID == ""
+  //   ) {
+  //     errList.push(element);
+  //   }
+  // }
+  // if (errList.length > 0) {
+  //   res.json({
+  //     status: "403MP",
+  //     message: "Missing or Invalid Parameter",
+  //     errorList: errList,
+  //   });
+  //   return false;
+  // } else {
+  //   //add condition
+  //   for (const element of lotteryList) {
+  //     let Lot = element.Lot == undefined ? "-" : element.Lot
+  //     let Draw = element.Draw == undefined ? "-" : element.Draw
+  //     await promiseOrder.execute(
+  //       "INSERT INTO transaction (Number_lottery,Lot,Draw,DrawDate,SID,OID,Status) VALUES (?,?,?,?,?,?,?)",
+  //       [
+  //         element.Number,
+  //         Lot,
+  //         Draw,
+  //         element.DrawDate,
+  //         element.SID,
+  //         element.OID,
+  //         Status,
+  //       ]
+  //     );
+  //   }
+  //   return true;
+  // }
 };
 
 const getStorename = async (SID) => {
@@ -1136,6 +1183,7 @@ const OrderConfirmedLottery = async (
                 PackAmount: element.PackAmount,
                 DrawDate: element.DrawDate,
                 SID: SID,
+                OID: OID,
                 Status: "Changed Amount",
               });
               updateOutOfStock(element.Number, SID, CID, element.PackAmount);
@@ -1165,6 +1213,7 @@ const OrderConfirmedLottery = async (
               PackAmount: element.PackAmount,
               DrawDate: element.DrawDate,
               SID: SID,
+              OID: OID,
               Status: "Changed Amount",
             });
             updateOutOfStock(element.Number, SID, CID, element.PackAmount);
@@ -1196,6 +1245,7 @@ const OrderConfirmedLottery = async (
                 PackAmount: element.PackAmount,
                 DrawDate: element.DrawDate,
                 SID: SID,
+                OID: OID,
                 Status: "Changed Amount",
               });
               updateOutOfStock(element.Number, SID, CID, element.PackAmount);
@@ -1224,6 +1274,7 @@ const OrderConfirmedLottery = async (
               PackAmount: element.PackAmount,
               DrawDate: element.DrawDate,
               SID: SID,
+              OID: OID,
               Status: "Changed Amount",
             });
             updateOutOfStock(element.Number, SID, CID, element.PackAmount);
@@ -1288,7 +1339,7 @@ const confirmedPayment = async (req, res, infoOrderList, OID) => {
       let status = out ? "Cancelled" : "Pending Payment";
       await promiseOrder.execute(
         "UPDATE order_c SET Status=? WHERE OID=? or relateId = ?",
-        [status, parseInt(OID), OID]
+        [status, OID, OID]
       );
       console.log("Update Error");
       
@@ -1299,13 +1350,13 @@ const confirmedPayment = async (req, res, infoOrderList, OID) => {
           infoOrderList[0].errorList,
           "Out of Stock"
         );
-      } else {
       }
+      console.log("Add Transaction Complete")
       res.json({
         status: "200CE", //check Error
         message: "Please review!",
         ListError: infoOrderList[0].errorList,
-        Status: status,
+        orderStatus: status,
         orderID: OID,
       });
       return;
